@@ -40,6 +40,9 @@ parse_args() {
 
 parse_args "$@"
 
+validate_name "name" "$NAME" || exit 1
+validate_name "prefix" "$PREFIX" || exit 1
+
 TARGET=$(find_pane "$PREFIX" "$NAME")
 tmux kill-window -t "$TARGET"
 echo "Killed '$NAME' in session '$PREFIX'"

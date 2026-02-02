@@ -69,4 +69,8 @@ cmd_list() {
 }
 
 parse_args "$@"
+
+source "$(dirname "$0")/_tmux-common"
+validate_name "prefix" "$PREFIX" || exit 1
+
 "cmd_$COMMAND"

@@ -13,3 +13,11 @@ find_pane() {
     fi
     echo "$prefix:$idx"
 }
+
+validate_name() {
+    local label="$1" value="$2"
+    if [[ "$value" =~ [:.!] ]]; then
+        echo "Error: $label cannot contain ':', '.', or '!'" >&2
+        return 1
+    fi
+}

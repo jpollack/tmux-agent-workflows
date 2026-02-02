@@ -53,6 +53,10 @@ pane_exists() {
 
 parse_args "$@"
 
+source "$(dirname "$0")/_tmux-common"
+validate_name "name" "$NAME" || exit 1
+validate_name "prefix" "$PREFIX" || exit 1
+
 if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
     echo "Error: session '$PREFIX' does not exist" >&2
     exit 1
