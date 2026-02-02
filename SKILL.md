@@ -1,52 +1,73 @@
 ---
 name: tmux-agent-workflows
-description: Use when running concurrent commands, long-running processes, or multiple background tasks. Use when needing to monitor output from several processes, interact with running programs, or spawn subagents in isolated sessions.
+description: Use when running concurrent commands, background processes, or parallel subagents. Use when needing to monitor, interact with, or wait for long-running tasks. Use when orchestrating multi-process workflows from a single session.
 ---
 
 # Tmux Agent Workflows
 
-Run concurrent commands, monitor output, and interact with processes via tmux.
-
-## Setup
-
-Scripts live in `bin/` of this project. Add to PATH or use full paths.
+Run concurrent commands, monitor output, wait for completion, and interact with processes via tmux.
 
 ## Quick Reference
 
 | Task | Command |
 |------|---------|
-| Start session | `tmux-session create` |
+| Start session | `tmux-session create [--prefix NAME]` |
 | Run command | `tmux-run --name build -- make -j4` |
+| Run in directory | `tmux-run --name build --dir /project -- make` |
 | Read output | `tmux-read --name build --last 20` |
-| Send input | `tmux-send --name repl --text "print(1)" --keys Enter` |
+| Wait for pattern | `tmux-read --name build --grep "DONE" --timeout 60` |
+| Wait for exit | `tmux-wait --name build --timeout 300` |
+| Send input | `tmux-send --name repl --text "quit" --keys Enter` |
+| Send Ctrl-C | `tmux-send --name server --keys C-c` |
 | List panes | `tmux-list` |
 | Kill pane | `tmux-kill --name build` |
 | End session | `tmux-session destroy` |
 
+All scripts support `--prefix NAME` (default: `agent`) and `--help`.
+
 ## Workflow
 
-1. `tmux-session create` — once per task
-2. `tmux-run --name NAME -- COMMAND` — for each concurrent process
-3. `tmux-read --name NAME --last N` — check output (use `--last` to limit context)
-4. `tmux-send --name NAME --text/--keys` — interact when needed
-5. `tmux-list` — check what's running
-6. `tmux-kill --name NAME` — stop processes you're done with
-7. `tmux-session destroy` — cleanup when finished
+```
+tmux-session create
+  -> tmux-run --name NAME -- COMMAND
+     -> tmux-read / tmux-wait / tmux-send (monitor, wait, interact)
+        -> tmux-kill --name NAME (when done)
+           -> tmux-session destroy (cleanup)
+```
 
-## Tips
-
-- Use `--last N` with tmux-read to avoid flooding context with output
-- Use `--prefix` to isolate different agent tasks from each other
-- All scripts support `--help` for full usage
-- Pane names must be unique within a session
-- Send `C-c` via `tmux-send --name NAME --keys C-c` to interrupt a process
+1. **Create session** once per task: `tmux-session create`
+2. **Run commands** in named panes: `tmux-run --name build -- make -j4`
+3. **Monitor** with `tmux-read --name build --last 20` or wait for specific output with `--grep`
+4. **Wait for completion** with `tmux-wait --name build --timeout 300` (returns the command's exit code, or 124 on timeout)
+5. **Check status** with `tmux-list` — shows `running` or `exited(N)` per pane
+6. **Interact** with `tmux-send --name repl --text "input" --keys Enter`
+7. **Cleanup**: `tmux-kill --name NAME` per pane, then `tmux-session destroy`
 
 ## Spawning Subagents
 
-Run Claude in a tmux pane for isolated subtasks:
+Run Claude in isolated tmux panes for parallel subtasks:
 
 ```bash
 tmux-run --name subtask1 -- claude -p "do something" --output-file /tmp/result1.txt
+tmux-run --name subtask2 -- claude -p "do other thing" --output-file /tmp/result2.txt
+
+# Wait for both
+tmux-wait --name subtask1 --timeout 600
+tmux-wait --name subtask2 --timeout 600
+
+# Read results from output files
 ```
 
-Check completion with `tmux-list` (look for "exited(0)"), read result from file.
+## Naming Rules
+
+Names and prefixes must **not** contain `:`, `.`, or `!` — tmux treats these as target separators. Names must be unique within a session.
+
+## Common Mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Flooding context with full output | Use `--last N` to limit lines |
+| Polling in a loop for output | Use `tmux-read --grep PATTERN --timeout N` |
+| Polling in a loop for exit | Use `tmux-wait --name NAME --timeout N` |
+| Forgetting to destroy session | Always `tmux-session destroy` when done |
+| Using `:` or `.` in names | Stick to alphanumeric and hyphens |
