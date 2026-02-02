@@ -43,3 +43,24 @@ teardown() {
     run tmux-read --prefix "$TEST_PREFIX" --name nonexistent
     [ "$status" -ne 0 ]
 }
+
+@test "tmux-read --grep waits for pattern" {
+    local helper="$BATS_TEST_TMPDIR/delayed.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+sleep 1
+echo "BUILD SUCCEEDED"
+sleep 60
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name grepper -- "$helper"
+    run tmux-read --prefix "$TEST_PREFIX" --name grepper --grep "BUILD SUCCEEDED" --timeout 10
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"BUILD SUCCEEDED"* ]]
+}
+
+@test "tmux-read --grep times out with exit 124" {
+    tmux-run --prefix "$TEST_PREFIX" --name grepper2 -- sleep 300
+    run tmux-read --prefix "$TEST_PREFIX" --name grepper2 --grep "NEVER" --timeout 3 --poll 1
+    [ "$status" -eq 124 ]
+}

@@ -15,6 +15,9 @@ Options:
   --name NAME     Target pane name (required)
   --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
   --last N        Show only last N lines
+  --grep PATTERN  Wait for PATTERN to appear in output
+  --timeout SECS  Max seconds to wait for --grep (default: 0 = forever)
+  --poll SECS     Polling interval for --grep (default: 2)
   --help          Show this help
 
 Output is written to stdout. Pipe or redirect as needed.
@@ -30,11 +33,17 @@ parse_args() {
     PREFIX="$DEFAULT_PREFIX"
     NAME=""
     LAST=""
+    GREP=""
+    GREP_TIMEOUT=0
+    GREP_POLL=2
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --name) NAME="$2"; shift 2 ;;
             --prefix) PREFIX="$2"; shift 2 ;;
             --last) LAST="$2"; shift 2 ;;
+            --grep) GREP="$2"; shift 2 ;;
+            --timeout) GREP_TIMEOUT="$2"; shift 2 ;;
+            --poll) GREP_POLL="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
@@ -51,11 +60,26 @@ validate_name "prefix" "$PREFIX" || exit 1
 
 TARGET=$(find_pane "$PREFIX" "$NAME")
 
-# Capture with history, join wrapped lines
-OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
-
-if [[ -n "$LAST" ]]; then
-    echo "$OUTPUT" | tail -n "$LAST"
+if [[ -n "$GREP" ]]; then
+    elapsed=0
+    while true; do
+        OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
+        if echo "$OUTPUT" | grep -qF "$GREP"; then
+            echo "$OUTPUT"
+            exit 0
+        fi
+        if [[ "$GREP_TIMEOUT" -gt 0 && "$elapsed" -ge "$GREP_TIMEOUT" ]]; then
+            echo "Timeout waiting for '$GREP' after ${GREP_TIMEOUT}s" >&2
+            exit 124
+        fi
+        sleep "$GREP_POLL"
+        elapsed=$((elapsed + GREP_POLL))
+    done
 else
-    echo "$OUTPUT"
+    OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
+    if [[ -n "$LAST" ]]; then
+        echo "$OUTPUT" | tail -n "$LAST"
+    else
+        echo "$OUTPUT"
+    fi
 fi
