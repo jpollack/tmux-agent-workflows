@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROG="tmux-session"
+DEFAULT_PREFIX="agent"
+
+usage() {
+    cat <<EOF
+Usage: $PROG <command> [options]
+
+Manage tmux sessions for agent workflows.
+
+Commands:
+  create   Create a new session
+  destroy  Destroy a session and all its panes
+  list     List sessions
+
+Options:
+  --prefix NAME   Session name prefix (default: $DEFAULT_PREFIX)
+  --help          Show this help
+
+Examples:
+  $PROG create                    # Create session "agent"
+  $PROG create --prefix myagent   # Create session "myagent"
+  $PROG list                      # List agent sessions
+  $PROG destroy                   # Destroy session "agent"
+EOF
+}
+
+parse_args() {
+    PREFIX="$DEFAULT_PREFIX"
+    COMMAND=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            create|destroy|list) COMMAND="$1"; shift ;;
+            --prefix) PREFIX="$2"; shift 2 ;;
+            --help) usage; exit 0 ;;
+            *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
+        esac
+    done
+    if [[ -z "$COMMAND" ]]; then
+        echo "Error: command required" >&2
+        usage >&2
+        exit 1
+    fi
+}
+
+cmd_create() {
+    if tmux has-session -t "$PREFIX" 2>/dev/null; then
+        echo "Error: session '$PREFIX' already exists" >&2
+        exit 1
+    fi
+    tmux new-session -d -s "$PREFIX" -x 200 -y 50
+    echo "Created session '$PREFIX'"
+}
+
+cmd_destroy() {
+    if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
+        echo "Error: session '$PREFIX' does not exist" >&2
+        exit 1
+    fi
+    tmux kill-session -t "$PREFIX"
+    echo "Destroyed session '$PREFIX'"
+}
+
+cmd_list() {
+    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^${PREFIX}" || true
+}
+
+parse_args "$@"
+"cmd_$COMMAND"
