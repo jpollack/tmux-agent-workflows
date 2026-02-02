@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROG="tmux-run"
+DEFAULT_PREFIX="agent"
+
+usage() {
+    cat <<EOF
+Usage: $PROG --name NAME [options] -- COMMAND [ARGS...]
+
+Run a command in a new tmux pane.
+
+Options:
+  --name NAME     Unique name for this pane (required)
+  --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
+  --help          Show this help
+
+Examples:
+  $PROG --name build -- make -j4
+  $PROG --name server -- python -m http.server 8000
+  $PROG --name tests -- npm test
+EOF
+}
+
+parse_args() {
+    PREFIX="$DEFAULT_PREFIX"
+    NAME=""
+    CMD=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --name) NAME="$2"; shift 2 ;;
+            --prefix) PREFIX="$2"; shift 2 ;;
+            --help) usage; exit 0 ;;
+            --) shift; CMD=("$@"); break ;;
+            *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
+        esac
+    done
+    if [[ -z "$NAME" ]]; then
+        echo "Error: --name is required" >&2
+        usage >&2
+        exit 1
+    fi
+    if [[ ${#CMD[@]} -eq 0 ]]; then
+        echo "Error: command required after --" >&2
+        usage >&2
+        exit 1
+    fi
+}
+
+pane_exists() {
+    tmux list-windows -t "$PREFIX" -F '#{window_name}' 2>/dev/null | grep -qx "$1"
+}
+
+parse_args "$@"
+
+if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
+    echo "Error: session '$PREFIX' does not exist" >&2
+    exit 1
+fi
+
+if pane_exists "$NAME"; then
+    echo "Error: pane '$NAME' already exists in session '$PREFIX'" >&2
+    exit 1
+fi
+
+# Create a new window, set its title
+tmux new-window -t "$PREFIX" -n "$NAME"
+tmux select-pane -t "$PREFIX:$NAME" -T "$NAME"
+tmux send-keys -t "$PREFIX:$NAME" "${CMD[*]}" Enter
+echo "Started '$NAME' in session '$PREFIX'"
