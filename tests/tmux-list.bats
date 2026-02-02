@@ -30,9 +30,12 @@ teardown() {
     [[ "$output" == *"quickjob"* ]]
 }
 
-@test "tmux-list empty is not error" {
+@test "tmux-list empty session shows no output" {
+    # Session created in setup has only the default window.
+    # tmux-list should filter it out.
     run tmux-list --prefix "$TEST_PREFIX"
     [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 @test "tmux-list shows exited(0) for completed command" {

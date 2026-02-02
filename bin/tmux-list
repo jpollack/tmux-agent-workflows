@@ -41,6 +41,7 @@ if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
 fi
 
 tmux list-windows -t "$PREFIX" -F '#{window_name} #{pane_dead} #{pane_dead_status} #{pane_current_command}' 2>/dev/null | while read -r name dead dead_status cmd; do
+    [[ "$name" == "_init" ]] && continue
     if [[ "$dead" == "1" ]]; then
         status="exited(${dead_status})"
     else
