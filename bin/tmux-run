@@ -67,8 +67,10 @@ if pane_exists "$NAME"; then
     exit 1
 fi
 
-# Create a new window, set its title
+# Create a new window, set remain-on-exit so the pane stays visible after
+# the command exits, then respawn-pane to run the actual command directly.
+# This preserves argument quoting (CMD[@]) and enables exit detection.
 tmux new-window -t "$PREFIX" -n "$NAME"
-tmux select-pane -t "$PREFIX:$NAME" -T "$NAME"
-tmux send-keys -t "$PREFIX:$NAME" "${CMD[*]}" Enter
+tmux set-option -t "$PREFIX:$NAME" remain-on-exit on
+tmux respawn-pane -k -t "$PREFIX:$NAME" "${CMD[@]}"
 echo "Started '$NAME' in session '$PREFIX'"

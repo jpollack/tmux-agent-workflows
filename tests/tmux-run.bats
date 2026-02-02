@@ -38,3 +38,19 @@ teardown() {
     run tmux-run --prefix "nonexistent-$$" --name foo -- echo hi
     [ "$status" -ne 0 ]
 }
+
+@test "tmux-run preserves command quoting" {
+    local helper="$BATS_TEST_TMPDIR/quoter.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+echo "ARGS:$#"
+for arg in "$@"; do echo "ARG:$arg"; done
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name quoter -- "$helper" "hello world" "foo bar"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name quoter
+    [[ "$output" == *"ARGS:2"* ]]
+    [[ "$output" == *"ARG:hello world"* ]]
+    [[ "$output" == *"ARG:foo bar"* ]]
+}
