@@ -34,3 +34,11 @@ teardown() {
     run tmux-send --prefix "$TEST_PREFIX" --name nonexistent --text "hi"
     [ "$status" -ne 0 ]
 }
+
+@test "tmux-send fails when pane is dead" {
+    tmux-run --prefix "$TEST_PREFIX" --name deadtarget -- true
+    sleep 1
+    run tmux-send --prefix "$TEST_PREFIX" --name deadtarget --text "hi"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"dead"* ]]
+}

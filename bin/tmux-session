@@ -66,7 +66,7 @@ cmd_destroy() {
 }
 
 cmd_list() {
-    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^${PREFIX}" || true
+    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -x "$PREFIX" || true
 }
 
 parse_args "$@"

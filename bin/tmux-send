@@ -56,6 +56,14 @@ validate_name "prefix" "$PREFIX" || exit 1
 
 TARGET=$(find_pane "$PREFIX" "$NAME")
 
+# Check if pane is dead
+PANE_DEAD=$(tmux list-windows -t "$PREFIX" -F '#{window_name} #{pane_dead}' 2>/dev/null \
+    | awk -v name="$NAME" '$1 == name {print $2; exit}')
+if [[ "$PANE_DEAD" == "1" ]]; then
+    echo "Error: pane '$NAME' is dead; cannot send input" >&2
+    exit 1
+fi
+
 if [[ -n "$TEXT" ]]; then
     tmux send-keys -t "$TARGET" -l "$TEXT"
 fi

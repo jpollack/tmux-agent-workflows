@@ -51,3 +51,14 @@ teardown() {
     run tmux-session list --prefix "nonexistent-$$"
     [ "$status" -eq 0 ]
 }
+
+@test "tmux-session list uses exact match not prefix match" {
+    local prefix2="${TEST_PREFIX}-extra"
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-session create --prefix "$prefix2"
+    run tmux-session list --prefix "$TEST_PREFIX"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "$TEST_PREFIX" ]]
+    [[ "$output" != *"$prefix2"* ]]
+    tmux kill-session -t "$prefix2" 2>/dev/null || true
+}

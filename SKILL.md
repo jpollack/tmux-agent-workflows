@@ -15,8 +15,8 @@ Run concurrent commands, monitor output, wait for completion, and interact with 
 | Run command | `tmux-run --name build -- make -j4` |
 | Run in directory | `tmux-run --name build --dir /project -- make` |
 | Read output | `tmux-read --name build --last 20` |
-| Wait for pattern | `tmux-read --name build --grep "DONE" --timeout 60` |
-| Wait for exit | `tmux-wait --name build --timeout 300` |
+| Wait for pattern | `tmux-read --name build --grep "DONE" --timeout 60 --last 20` |
+| Wait for exit | `tmux-wait --name build --timeout 300 --poll 5` |
 | Send input | `tmux-send --name repl --text "quit" --keys Enter` |
 | Send Ctrl-C | `tmux-send --name server --keys C-c` |
 | List panes | `tmux-list` |
@@ -71,3 +71,4 @@ Names and prefixes must **not** contain `:`, `.`, or `!` — tmux treats these a
 | Polling in a loop for exit | Use `tmux-wait --name NAME --timeout N` |
 | Forgetting to destroy session | Always `tmux-session destroy` when done |
 | Using `:` or `.` in names | Stick to alphanumeric and hyphens |
+| Sending input to a dead pane | Check `tmux-list` status before `tmux-send` |

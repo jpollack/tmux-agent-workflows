@@ -60,3 +60,9 @@ teardown() {
     [ "$status" -ne 0 ]
     [[ "$output" == *"cannot contain"* ]]
 }
+
+@test "tmux-list rejects prefix with special chars" {
+    run tmux-list --prefix "bad:prefix"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot contain"* ]]
+}

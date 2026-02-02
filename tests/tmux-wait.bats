@@ -36,3 +36,9 @@ teardown() {
     run tmux-wait --prefix "$TEST_PREFIX" --name nope --timeout 5
     [ "$status" -ne 0 ]
 }
+
+@test "tmux-wait rejects non-positive --poll" {
+    run tmux-wait --prefix "$TEST_PREFIX" --name nope --poll 0
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"--poll must be positive"* ]]
+}

@@ -64,3 +64,50 @@ SCRIPT
     run tmux-read --prefix "$TEST_PREFIX" --name grepper2 --grep "NEVER" --timeout 3 --poll 1
     [ "$status" -eq 124 ]
 }
+
+@test "tmux-read strips trailing blank lines" {
+    local helper="$BATS_TEST_TMPDIR/blanks.sh"
+    printf '#!/bin/bash\necho "CONTENT"\nsleep 60\n' > "$helper"
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name blanks -- "$helper"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name blanks
+    [ "$status" -eq 0 ]
+    # Last line of output should not be blank
+    last_line="${lines[${#lines[@]}-1]}"
+    [[ -n "$last_line" ]]
+    [[ "$last_line" != *[[:space:]]* || "$last_line" == *[^[:space:]]* ]]
+}
+
+@test "tmux-read strips Pane is dead line" {
+    tmux-run --prefix "$TEST_PREFIX" --name deadpane -- echo "DEADTEST"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name deadpane
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"DEADTEST"* ]]
+    [[ "$output" != *"Pane is dead"* ]]
+}
+
+@test "tmux-read --grep with --last N returns last N lines" {
+    local helper="$BATS_TEST_TMPDIR/greplines.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+for i in $(seq 1 20); do echo "gline$i"; done
+echo "MARKER"
+sleep 60
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name greplines -- "$helper"
+    run tmux-read --prefix "$TEST_PREFIX" --name greplines --grep "MARKER" --timeout 10 --last 3
+    [ "$status" -eq 0 ]
+    # Should have exactly 3 lines
+    [ "${#lines[@]}" -eq 3 ]
+    [[ "$output" == *"MARKER"* ]]
+}
+
+@test "tmux-read --grep rejects non-positive --poll" {
+    tmux-run --prefix "$TEST_PREFIX" --name polltest -- sleep 300
+    run tmux-read --prefix "$TEST_PREFIX" --name polltest --grep "X" --poll 0
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"--poll must be positive"* ]]
+}

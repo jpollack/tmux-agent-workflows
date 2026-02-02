@@ -52,6 +52,11 @@ parse_args "$@"
 validate_name "name" "$NAME" || exit 1
 validate_name "prefix" "$PREFIX" || exit 1
 
+if [[ "$POLL" -le 0 ]]; then
+    echo "Error: --poll must be positive" >&2
+    exit 1
+fi
+
 if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
     echo "Error: session '$PREFIX' does not exist" >&2
     exit 1
