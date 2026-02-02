@@ -16,8 +16,8 @@ find_pane() {
 
 validate_name() {
     local label="$1" value="$2"
-    if [[ "$value" =~ [:.![:space:]] ]]; then
-        echo "Error: $label cannot contain ':', '.', '!', or whitespace" >&2
+    if [[ "$value" =~ [:.!\"\\[:space:]] ]]; then
+        echo "Error: $label cannot contain ':', '.', '!', '\"', '\\', or whitespace" >&2
         return 1
     fi
 }

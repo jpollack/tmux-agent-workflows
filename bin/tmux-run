@@ -15,6 +15,8 @@ Options:
   --prefix NAME     Session prefix (default: $DEFAULT_PREFIX)
   --dir PATH        Working directory for the command
   --env KEY=VALUE   Set environment variable (repeatable)
+  --replace         Respawn a dead pane with the new command
+  --quiet, -q       Suppress informational output
   --help            Show this help
 
 Examples:
@@ -30,12 +32,16 @@ parse_args() {
     DIR=""
     ENV_VARS=()
     CMD=()
+    REPLACE=false
+    QUIET=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --name) NAME="$2"; shift 2 ;;
-            --prefix) PREFIX="$2"; shift 2 ;;
-            --dir) DIR="$2"; shift 2 ;;
-            --env) ENV_VARS+=("$2"); shift 2 ;;
+            --name) [[ $# -ge 2 ]] || { echo "Error: --name requires a value" >&2; exit 1; }; NAME="$2"; shift 2 ;;
+            --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
+            --dir) [[ $# -ge 2 ]] || { echo "Error: --dir requires a value" >&2; exit 1; }; DIR="$2"; shift 2 ;;
+            --env) [[ $# -ge 2 ]] || { echo "Error: --env requires a value" >&2; exit 1; }; ENV_VARS+=("$2"); shift 2 ;;
+            --replace) REPLACE=true; shift ;;
+            --quiet|-q) QUIET=true; shift ;;
             --help) usage; exit 0 ;;
             --) shift; CMD=("$@"); break ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
@@ -69,8 +75,18 @@ if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
 fi
 
 if pane_exists "$NAME"; then
-    echo "Error: pane '$NAME' already exists in session '$PREFIX'" >&2
-    exit 1
+    if [[ "$REPLACE" == true ]]; then
+        # Check if pane is dead before replacing
+        PANE_DEAD=$(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}' 2>/dev/null \
+            | awk -F'|' -v name="$NAME" '$1 == name {print $2; exit}')
+        if [[ "$PANE_DEAD" != "1" ]]; then
+            echo "Error: pane '$NAME' is still running; cannot replace" >&2
+            exit 1
+        fi
+    else
+        echo "Error: pane '$NAME' already exists in session '$PREFIX'" >&2
+        exit 1
+    fi
 fi
 
 # Prefix command with env vars if any
@@ -78,18 +94,28 @@ if [[ ${#ENV_VARS[@]} -gt 0 ]]; then
     CMD=(env "${ENV_VARS[@]}" "${CMD[@]}")
 fi
 
-# Create a new window, set remain-on-exit so the pane stays visible after
-# the command exits, then respawn-pane to run the actual command directly.
-# This preserves argument quoting (CMD[@]) and enables exit detection.
-if [[ -n "$DIR" ]]; then
-    tmux new-window -t "$PREFIX" -n "$NAME" -c "$DIR"
+if [[ "$REPLACE" == true ]] && pane_exists "$NAME"; then
+    # Respawn the existing dead pane with the new command
+    if [[ -n "$DIR" ]]; then
+        tmux respawn-pane -k -t "$PREFIX:$NAME" -c "$DIR" "${CMD[@]}"
+    else
+        tmux respawn-pane -k -t "$PREFIX:$NAME" "${CMD[@]}"
+    fi
+    [[ "$QUIET" == true ]] || echo "Replaced '$NAME' in session '$PREFIX'"
 else
-    tmux new-window -t "$PREFIX" -n "$NAME"
+    # Create a new window, set remain-on-exit so the pane stays visible after
+    # the command exits, then respawn-pane to run the actual command directly.
+    # This preserves argument quoting (CMD[@]) and enables exit detection.
+    if [[ -n "$DIR" ]]; then
+        tmux new-window -t "$PREFIX" -n "$NAME" -c "$DIR"
+    else
+        tmux new-window -t "$PREFIX" -n "$NAME"
+    fi
+    tmux set-option -t "$PREFIX:$NAME" remain-on-exit on
+    if [[ -n "$DIR" ]]; then
+        tmux respawn-pane -k -t "$PREFIX:$NAME" -c "$DIR" "${CMD[@]}"
+    else
+        tmux respawn-pane -k -t "$PREFIX:$NAME" "${CMD[@]}"
+    fi
+    [[ "$QUIET" == true ]] || echo "Started '$NAME' in session '$PREFIX'"
 fi
-tmux set-option -t "$PREFIX:$NAME" remain-on-exit on
-if [[ -n "$DIR" ]]; then
-    tmux respawn-pane -k -t "$PREFIX:$NAME" -c "$DIR" "${CMD[@]}"
-else
-    tmux respawn-pane -k -t "$PREFIX:$NAME" "${CMD[@]}"
-fi
-echo "Started '$NAME' in session '$PREFIX'"

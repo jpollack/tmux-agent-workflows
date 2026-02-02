@@ -47,6 +47,7 @@ teardown() {
     kill -9 "$pane_pid"
     run tmux-wait --prefix "$TEST_PREFIX" --name killed --timeout 10
     [ "$status" -ne 0 ]
+    [[ "$output" == *"unknown status"* ]]
 }
 
 @test "tmux-wait rejects non-positive --poll" {

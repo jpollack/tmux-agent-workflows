@@ -16,9 +16,11 @@ Options:
   --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
   --last N        Show only last N lines
   --start N       Skip first N lines
-  --grep PATTERN  Wait for PATTERN to appear in output
+  --grep PATTERN  Wait for fixed string PATTERN to appear in output
+  --grep-regex    Treat --grep PATTERN as extended regex instead of fixed string
   --timeout SECS  Max seconds to wait for --grep (default: 0 = forever)
   --poll SECS     Polling interval for --grep (default: 2)
+  --history N     Scrollback lines to capture (default: 1000)
   --help          Show this help
 
 Output is written to stdout. Pipe or redirect as needed.
@@ -36,17 +38,21 @@ parse_args() {
     LAST=""
     START=""
     GREP=""
+    GREP_REGEX=false
     GREP_TIMEOUT=0
     GREP_POLL=2
+    HISTORY=1000
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --name) NAME="$2"; shift 2 ;;
-            --prefix) PREFIX="$2"; shift 2 ;;
-            --last) LAST="$2"; shift 2 ;;
-            --start) START="$2"; shift 2 ;;
-            --grep) GREP="$2"; shift 2 ;;
-            --timeout) GREP_TIMEOUT="$2"; shift 2 ;;
-            --poll) GREP_POLL="$2"; shift 2 ;;
+            --name) [[ $# -ge 2 ]] || { echo "Error: --name requires a value" >&2; exit 1; }; NAME="$2"; shift 2 ;;
+            --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
+            --last) [[ $# -ge 2 ]] || { echo "Error: --last requires a value" >&2; exit 1; }; LAST="$2"; shift 2 ;;
+            --start) [[ $# -ge 2 ]] || { echo "Error: --start requires a value" >&2; exit 1; }; START="$2"; shift 2 ;;
+            --grep) [[ $# -ge 2 ]] || { echo "Error: --grep requires a value" >&2; exit 1; }; GREP="$2"; shift 2 ;;
+            --grep-regex) GREP_REGEX=true; shift ;;
+            --timeout) [[ $# -ge 2 ]] || { echo "Error: --timeout requires a value" >&2; exit 1; }; GREP_TIMEOUT="$2"; shift 2 ;;
+            --poll) [[ $# -ge 2 ]] || { echo "Error: --poll requires a value" >&2; exit 1; }; GREP_POLL="$2"; shift 2 ;;
+            --history) [[ $# -ge 2 ]] || { echo "Error: --history requires a value" >&2; exit 1; }; HISTORY="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
@@ -84,10 +90,15 @@ if [[ -n "$GREP" ]]; then
         echo "Error: --poll must be positive" >&2
         exit 1
     fi
+    if [[ "$GREP_REGEX" == true ]]; then
+        GREP_FLAG="-qE"
+    else
+        GREP_FLAG="-qF"
+    fi
     elapsed=0
     while true; do
-        OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
-        if echo "$OUTPUT" | grep -qF "$GREP"; then
+        OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -"$HISTORY" -J)
+        if echo "$OUTPUT" | grep $GREP_FLAG "$GREP"; then
             echo "$OUTPUT" | apply_filters
             exit 0
         fi
@@ -99,6 +110,6 @@ if [[ -n "$GREP" ]]; then
         elapsed=$((elapsed + GREP_POLL))
     done
 else
-    OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
+    OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -"$HISTORY" -J)
     echo "$OUTPUT" | apply_filters
 fi

@@ -86,3 +86,29 @@ SCRIPT
     run tmux-read --prefix "$TEST_PREFIX" --name dirtest
     [[ "$output" == *"$workdir"* ]]
 }
+
+@test "tmux-run --replace respawns dead pane" {
+    tmux-run --prefix "$TEST_PREFIX" --name replaceme -- true
+    sleep 1
+    # Pane should be dead now
+    run tmux-run --prefix "$TEST_PREFIX" --name replaceme --replace -- echo replaced
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Replaced"* ]]
+    sleep 0.5
+    run tmux-read --prefix "$TEST_PREFIX" --name replaceme
+    [[ "$output" == *"replaced"* ]]
+}
+
+@test "tmux-run --replace fails if pane is still running" {
+    tmux-run --prefix "$TEST_PREFIX" --name running -- sleep 300
+    sleep 0.3
+    run tmux-run --prefix "$TEST_PREFIX" --name running --replace -- echo nope
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"still running"* ]]
+}
+
+@test "tmux-run --quiet suppresses output" {
+    run tmux-run --prefix "$TEST_PREFIX" --name quietjob --quiet -- echo hi
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}

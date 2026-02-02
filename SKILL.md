@@ -14,16 +14,20 @@ Run concurrent commands, monitor output, wait for completion, and interact with 
 | Start session | `tmux-session create [--prefix NAME]` |
 | Run command | `tmux-run --name build -- make -j4` |
 | Run in directory | `tmux-run --name build --dir /project -- make` |
+| Restart dead pane | `tmux-run --name build --replace -- make -j4` |
 | Read output | `tmux-read --name build --last 20` |
+| Read more history | `tmux-read --name build --history 5000` |
 | Wait for pattern | `tmux-read --name build --grep "DONE" --timeout 60 --last 20` |
+| Wait for regex | `tmux-read --name build --grep "OK\|DONE" --grep-regex --timeout 60` |
 | Wait for exit | `tmux-wait --name build --timeout 300 --poll 5` |
 | Send input | `tmux-send --name repl --text "quit" --keys Enter` |
 | Send Ctrl-C | `tmux-send --name server --keys C-c` |
 | List panes | `tmux-list` |
+| List all sessions | `tmux-session list --all` |
 | Kill pane | `tmux-kill --name build` |
 | End session | `tmux-session destroy` |
 
-All scripts support `--prefix NAME` (default: `agent`) and `--help`.
+All scripts support `--prefix NAME` (default: `agent`), `--quiet`/`-q`, and `--help`.
 
 ## Workflow
 
@@ -60,7 +64,7 @@ tmux-wait --name subtask2 --timeout 600
 
 ## Naming Rules
 
-Names and prefixes must **not** contain ':', '.', '!', or whitespace — tmux treats these as target separators and whitespace breaks field parsing. Names must be unique within a session.
+Names and prefixes must **not** contain ':', '.', '!', '"', '\\', or whitespace — tmux treats these as target separators, quotes and backslashes break JSON output, and whitespace breaks field parsing. Names must be unique within a session.
 
 ## Common Mistakes
 
@@ -70,5 +74,5 @@ Names and prefixes must **not** contain ':', '.', '!', or whitespace — tmux tr
 | Polling in a loop for output | Use `tmux-read --grep PATTERN --timeout N` |
 | Polling in a loop for exit | Use `tmux-wait --name NAME --timeout N` |
 | Forgetting to destroy session | Always `tmux-session destroy` when done |
-| Using ':', '.', or spaces in names | Stick to alphanumeric and hyphens |
+| Using special chars in names | Stick to alphanumeric and hyphens |
 | Sending input to a dead pane | Check `tmux-list` status before `tmux-send` |

@@ -17,6 +17,8 @@ Commands:
 
 Options:
   --prefix NAME   Session name prefix (default: $DEFAULT_PREFIX)
+  --all           List all tmux sessions (with 'list' command)
+  --quiet, -q     Suppress informational output
   --help          Show this help
 
 Examples:
@@ -30,10 +32,14 @@ EOF
 parse_args() {
     PREFIX="$DEFAULT_PREFIX"
     COMMAND=""
+    ALL=false
+    QUIET=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
             create|destroy|list) COMMAND="$1"; shift ;;
-            --prefix) PREFIX="$2"; shift 2 ;;
+            --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
+            --all) ALL=true; shift ;;
+            --quiet|-q) QUIET=true; shift ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
@@ -53,7 +59,7 @@ cmd_create() {
     tmux new-session -d -s "$PREFIX" -x 200 -y 50
     tmux set-option -t "$PREFIX" remain-on-exit on
     tmux rename-window -t "$PREFIX:0" _init
-    echo "Created session '$PREFIX'"
+    [[ "$QUIET" == true ]] || echo "Created session '$PREFIX'"
 }
 
 cmd_destroy() {
@@ -62,11 +68,15 @@ cmd_destroy() {
         exit 1
     fi
     tmux kill-session -t "$PREFIX"
-    echo "Destroyed session '$PREFIX'"
+    [[ "$QUIET" == true ]] || echo "Destroyed session '$PREFIX'"
 }
 
 cmd_list() {
-    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -x "$PREFIX" || true
+    if [[ "$ALL" == true ]]; then
+        tmux list-sessions -F '#{session_name}' 2>/dev/null || true
+    else
+        tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -x "$PREFIX" || true
+    fi
 }
 
 parse_args "$@"

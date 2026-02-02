@@ -138,3 +138,44 @@ SCRIPT
     [ "$status" -eq 1 ]
     [[ "$output" == *"--poll must be positive"* ]]
 }
+
+@test "tmux-read --history controls scrollback capture" {
+    local helper="$BATS_TEST_TMPDIR/manylines.sh"
+    printf '#!/bin/bash\nfor i in $(seq 1 50); do echo "histline$i"; done\nsleep 60\n' > "$helper"
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name histtest -- "$helper"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name histtest --history 5000
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"histline1"* ]]
+    [[ "$output" == *"histline50"* ]]
+}
+
+@test "tmux-read --grep-regex uses extended regex" {
+    local helper="$BATS_TEST_TMPDIR/regextest.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+echo "BUILD OK 42"
+sleep 60
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name regextest -- "$helper"
+    run tmux-read --prefix "$TEST_PREFIX" --name regextest --grep "BUILD OK [0-9]+" --grep-regex --timeout 10
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"BUILD OK 42"* ]]
+}
+
+@test "tmux-read --grep without --grep-regex uses fixed string" {
+    local helper="$BATS_TEST_TMPDIR/fixedtest.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+echo "[OK]"
+sleep 60
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name fixedtest -- "$helper"
+    # [OK] as fixed string matches literally, not as regex char class
+    run tmux-read --prefix "$TEST_PREFIX" --name fixedtest --grep "[OK]" --timeout 10
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"[OK]"* ]]
+}

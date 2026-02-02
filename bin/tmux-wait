@@ -35,10 +35,10 @@ parse_args() {
     POLL=2
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --name) NAME="$2"; shift 2 ;;
-            --prefix) PREFIX="$2"; shift 2 ;;
-            --timeout) TIMEOUT="$2"; shift 2 ;;
-            --poll) POLL="$2"; shift 2 ;;
+            --name) [[ $# -ge 2 ]] || { echo "Error: --name requires a value" >&2; exit 1; }; NAME="$2"; shift 2 ;;
+            --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
+            --timeout) [[ $# -ge 2 ]] || { echo "Error: --timeout requires a value" >&2; exit 1; }; TIMEOUT="$2"; shift 2 ;;
+            --poll) [[ $# -ge 2 ]] || { echo "Error: --poll requires a value" >&2; exit 1; }; POLL="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
@@ -76,6 +76,7 @@ while true; do
 
     if [[ "$dead" == "1" ]]; then
         if [[ -z "$dead_status" ]]; then
+            echo "Pane '$NAME' exited with unknown status (likely killed)" >&2
             exit 1
         fi
         exit "$dead_status"

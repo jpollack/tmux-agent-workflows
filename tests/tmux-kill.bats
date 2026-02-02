@@ -46,3 +46,11 @@ teardown() {
     run tmux-kill --prefix "$TEST_PREFIX" --name nonexistent
     [ "$status" -ne 0 ]
 }
+
+@test "tmux-kill --quiet suppresses output" {
+    tmux-run --prefix "$TEST_PREFIX" --name quietvictim -- sleep 60
+    sleep 0.3
+    run tmux-kill --prefix "$TEST_PREFIX" --name quietvictim --quiet
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}

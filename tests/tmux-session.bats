@@ -62,3 +62,28 @@ teardown() {
     [[ "$output" != *"$prefix2"* ]]
     tmux kill-session -t "$prefix2" 2>/dev/null || true
 }
+
+@test "tmux-session list --all shows all sessions" {
+    local prefix2="${TEST_PREFIX}-extra"
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-session create --prefix "$prefix2"
+    run tmux-session list --all
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"$TEST_PREFIX"* ]]
+    [[ "$output" == *"$prefix2"* ]]
+    tmux kill-session -t "$prefix2" 2>/dev/null || true
+}
+
+@test "tmux-session create --quiet suppresses output" {
+    run tmux-session create --prefix "$TEST_PREFIX" --quiet
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    tmux has-session -t "$TEST_PREFIX" 2>/dev/null
+}
+
+@test "tmux-session destroy --quiet suppresses output" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    run tmux-session destroy --prefix "$TEST_PREFIX" --quiet
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}

@@ -33,10 +33,10 @@ parse_args() {
     KEYS=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --name) NAME="$2"; shift 2 ;;
-            --prefix) PREFIX="$2"; shift 2 ;;
-            --text) TEXT="$2"; shift 2 ;;
-            --keys) KEYS="$2"; shift 2 ;;
+            --name) [[ $# -ge 2 ]] || { echo "Error: --name requires a value" >&2; exit 1; }; NAME="$2"; shift 2 ;;
+            --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
+            --text) [[ $# -ge 2 ]] || { echo "Error: --text requires a value" >&2; exit 1; }; TEXT="$2"; shift 2 ;;
+            --keys) [[ $# -ge 2 ]] || { echo "Error: --keys requires a value" >&2; exit 1; }; KEYS="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac

@@ -33,8 +33,8 @@ parse_args() {
     FORMAT="text"
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --prefix) PREFIX="$2"; shift 2 ;;
-            --format) FORMAT="$2"; shift 2 ;;
+            --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
+            --format) [[ $# -ge 2 ]] || { echo "Error: --format requires a value" >&2; exit 1; }; FORMAT="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
