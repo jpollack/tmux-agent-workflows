@@ -51,6 +51,7 @@ cmd_create() {
         exit 1
     fi
     tmux new-session -d -s "$PREFIX" -x 200 -y 50
+    tmux set-option -t "$PREFIX" remain-on-exit on
     echo "Created session '$PREFIX'"
 }
 
