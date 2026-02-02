@@ -54,3 +54,19 @@ SCRIPT
     [[ "$output" == *"ARG:hello world"* ]]
     [[ "$output" == *"ARG:foo bar"* ]]
 }
+
+@test "tmux-run --dir sets working directory" {
+    local workdir="$BATS_TEST_TMPDIR/workdir"
+    mkdir -p "$workdir"
+    local helper="$BATS_TEST_TMPDIR/pwder.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+pwd
+sleep 60
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name dirtest --dir "$workdir" -- "$helper"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name dirtest
+    [[ "$output" == *"$workdir"* ]]
+}
