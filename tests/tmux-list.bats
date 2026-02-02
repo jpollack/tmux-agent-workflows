@@ -90,3 +90,14 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"fail-job"*"exited(1)"* ]]
 }
+
+@test "tmux-list --format json produces valid JSON for each line" {
+    tmux-run --prefix "$TEST_PREFIX" --name jsontest -- sleep 60
+    sleep 0.3
+    run tmux-list --prefix "$TEST_PREFIX" --format json
+    [ "$status" -eq 0 ]
+    # Validate each line is valid JSON using python (widely available)
+    while IFS= read -r line; do
+        echo "$line" | python3 -c "import sys,json; json.load(sys.stdin)"
+    done <<< "$output"
+}

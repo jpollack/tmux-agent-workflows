@@ -62,11 +62,14 @@ tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_statu
         status="running"
     fi
     if [[ "$FORMAT" == "json" ]]; then
+        # Escape backslashes and double quotes in command field
+        safe_cmd="${cmd//\\/\\\\}"
+        safe_cmd="${safe_cmd//\"/\\\"}"
         if [[ "$dead" == "1" ]]; then
             printf '{"name":"%s","status":"exited","exit_code":%s,"command":"%s"}\n' \
-                "$name" "${dead_status:-null}" "$cmd"
+                "$name" "${dead_status:-null}" "$safe_cmd"
         else
-            printf '{"name":"%s","status":"running","command":"%s"}\n' "$name" "$cmd"
+            printf '{"name":"%s","status":"running","command":"%s"}\n' "$name" "$safe_cmd"
         fi
     else
         echo "$name $status $cmd"

@@ -18,6 +18,7 @@ Options:
   --start N       Skip first N lines
   --grep PATTERN  Wait for fixed string PATTERN to appear in output
   --grep-regex    Treat --grep PATTERN as extended regex instead of fixed string
+  --grep-invert   Succeed when PATTERN is NOT found (wait for disappearance)
   --timeout SECS  Max seconds to wait for --grep (default: 0 = forever)
   --poll SECS     Polling interval for --grep (default: 2)
   --history N     Scrollback lines to capture (default: 1000)
@@ -39,6 +40,7 @@ parse_args() {
     START=""
     GREP=""
     GREP_REGEX=false
+    GREP_INVERT=false
     GREP_TIMEOUT=0
     GREP_POLL=2
     HISTORY=1000
@@ -50,6 +52,7 @@ parse_args() {
             --start) [[ $# -ge 2 ]] || { echo "Error: --start requires a value" >&2; exit 1; }; START="$2"; shift 2 ;;
             --grep) [[ $# -ge 2 ]] || { echo "Error: --grep requires a value" >&2; exit 1; }; GREP="$2"; shift 2 ;;
             --grep-regex) GREP_REGEX=true; shift ;;
+            --grep-invert) GREP_INVERT=true; shift ;;
             --timeout) [[ $# -ge 2 ]] || { echo "Error: --timeout requires a value" >&2; exit 1; }; GREP_TIMEOUT="$2"; shift 2 ;;
             --poll) [[ $# -ge 2 ]] || { echo "Error: --poll requires a value" >&2; exit 1; }; GREP_POLL="$2"; shift 2 ;;
             --history) [[ $# -ge 2 ]] || { echo "Error: --history requires a value" >&2; exit 1; }; HISTORY="$2"; shift 2 ;;
@@ -98,9 +101,26 @@ if [[ -n "$GREP" ]]; then
     elapsed=0
     while true; do
         OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -"$HISTORY" -J)
-        if echo "$OUTPUT" | grep $GREP_FLAG "$GREP"; then
-            echo "$OUTPUT" | apply_filters
-            exit 0
+        if [[ "$GREP_INVERT" == true ]]; then
+            if ! echo "$OUTPUT" | grep $GREP_FLAG "$GREP"; then
+                echo "$OUTPUT" | apply_filters
+                exit 0
+            fi
+        else
+            if echo "$OUTPUT" | grep $GREP_FLAG "$GREP"; then
+                echo "$OUTPUT" | apply_filters
+                exit 0
+            fi
+        fi
+        # Check if pane is dead — output will never change
+        pane_dead=$(tmux display-message -t "$TARGET" -p '#{pane_dead}' 2>/dev/null || echo "1")
+        if [[ "$pane_dead" == "1" ]]; then
+            if [[ "$GREP_INVERT" == true ]]; then
+                echo "Error: pattern '$GREP' still present; pane '${TARGET}' has exited" >&2
+            else
+                echo "Error: pattern '$GREP' not found; pane '${TARGET}' has exited" >&2
+            fi
+            exit 1
         fi
         if [[ "$GREP_TIMEOUT" -gt 0 && "$elapsed" -ge "$GREP_TIMEOUT" ]]; then
             echo "Timeout waiting for '$GREP' after ${GREP_TIMEOUT}s" >&2

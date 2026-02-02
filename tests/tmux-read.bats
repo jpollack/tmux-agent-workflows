@@ -179,3 +179,41 @@ SCRIPT
     [ "$status" -eq 0 ]
     [[ "$output" == *"[OK]"* ]]
 }
+
+@test "tmux-read --grep exits early on dead pane" {
+    tmux-run --prefix "$TEST_PREFIX" --name deadgrep -- echo "no match here"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name deadgrep --grep "NEVER_FOUND" --timeout 30 --poll 1
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not found"* ]]
+    [[ "$output" == *"has exited"* ]]
+}
+
+@test "tmux-read --grep-invert succeeds when pattern absent" {
+    local helper="$BATS_TEST_TMPDIR/nopat.sh"
+    printf '#!/bin/bash\necho "hello world"\nsleep 60\n' > "$helper"
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name invertok -- "$helper"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name invertok --grep "ABSENT" --grep-invert --timeout 10
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"hello world"* ]]
+}
+
+@test "tmux-read --grep-invert waits for pattern to disappear" {
+    local helper="$BATS_TEST_TMPDIR/disappear.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+echo "COMPILING"
+sleep 2
+# tmux capture shows current screen; clear and print done
+clear
+echo "DONE"
+sleep 60
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name invertwait -- "$helper"
+    run tmux-read --prefix "$TEST_PREFIX" --name invertwait --grep "COMPILING" --grep-invert --timeout 15 --poll 1
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"DONE"* ]]
+}

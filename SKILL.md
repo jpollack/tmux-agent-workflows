@@ -19,7 +19,9 @@ Run concurrent commands, monitor output, wait for completion, and interact with 
 | Read more history | `tmux-read --name build --history 5000` |
 | Wait for pattern | `tmux-read --name build --grep "DONE" --timeout 60 --last 20` |
 | Wait for regex | `tmux-read --name build --grep "OK\|DONE" --grep-regex --timeout 60` |
+| Wait for disappearance | `tmux-read --name build --grep "COMPILING" --grep-invert --timeout 60` |
 | Wait for exit | `tmux-wait --name build --timeout 300 --poll 5` |
+| Wait and print code | `tmux-wait --name build --timeout 300 --print` |
 | Send input | `tmux-send --name repl --text "quit" --keys Enter` |
 | Send Ctrl-C | `tmux-send --name server --keys C-c` |
 | List panes | `tmux-list` |
@@ -27,7 +29,7 @@ Run concurrent commands, monitor output, wait for completion, and interact with 
 | Kill pane | `tmux-kill --name build` |
 | End session | `tmux-session destroy` |
 
-All scripts support `--prefix NAME` (default: `agent`), `--quiet`/`-q`, and `--help`.
+All scripts support `--prefix NAME` (default: `agent`) and `--help`. `--quiet`/`-q` is available on `tmux-session`, `tmux-run`, `tmux-kill`, and `tmux-wait`.
 
 ## Workflow
 
