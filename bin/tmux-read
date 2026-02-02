@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROG="tmux-read"
+DEFAULT_PREFIX="agent"
+
+usage() {
+    cat <<EOF
+Usage: $PROG --name NAME [options]
+
+Read output from a named tmux pane.
+
+Options:
+  --name NAME     Target pane name (required)
+  --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
+  --last N        Show only last N lines
+  --help          Show this help
+
+Output is written to stdout. Pipe or redirect as needed.
+
+Examples:
+  $PROG --name build                   # All visible output
+  $PROG --name build --last 20         # Last 20 lines
+  $PROG --name server | grep ERROR     # Filter output
+EOF
+}
+
+parse_args() {
+    PREFIX="$DEFAULT_PREFIX"
+    NAME=""
+    LAST=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --name) NAME="$2"; shift 2 ;;
+            --prefix) PREFIX="$2"; shift 2 ;;
+            --last) LAST="$2"; shift 2 ;;
+            --help) usage; exit 0 ;;
+            *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
+        esac
+    done
+    if [[ -z "$NAME" ]]; then
+        echo "Error: --name is required" >&2; usage >&2; exit 1
+    fi
+}
+
+find_pane() {
+    local idx
+    idx=$(tmux list-windows -t "$PREFIX" -F '#{window_index}:#{window_name}' 2>/dev/null | grep ":${1}$" | head -1 | cut -d: -f1)
+    if [[ -z "$idx" ]]; then
+        echo "Error: pane '$1' not found in session '$PREFIX'" >&2
+        exit 1
+    fi
+    echo "$PREFIX:$idx"
+}
+
+parse_args "$@"
+
+TARGET=$(find_pane "$NAME")
+
+# Capture with history, join wrapped lines
+OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
+
+if [[ -n "$LAST" ]]; then
+    echo "$OUTPUT" | tail -n "$LAST"
+else
+    echo "$OUTPUT"
+fi
