@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROG="tmux-send"
+DEFAULT_PREFIX="agent"
+
+usage() {
+    cat <<EOF
+Usage: $PROG --name NAME [options] (--text TEXT | --keys KEYS)
+
+Send input to a named tmux pane.
+
+Options:
+  --name NAME     Target pane name (required)
+  --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
+  --text TEXT     Send text literally (no trailing Enter)
+  --keys KEYS     Send tmux key names (e.g. Enter, C-c, Escape)
+  --help          Show this help
+
+Examples:
+  $PROG --name server --text "quit"
+  $PROG --name server --keys Enter
+  $PROG --name server --keys C-c          # Send Ctrl-C
+  $PROG --name build --text "make" --keys Enter
+EOF
+}
+
+parse_args() {
+    PREFIX="$DEFAULT_PREFIX"
+    NAME=""
+    TEXT=""
+    KEYS=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --name) NAME="$2"; shift 2 ;;
+            --prefix) PREFIX="$2"; shift 2 ;;
+            --text) TEXT="$2"; shift 2 ;;
+            --keys) KEYS="$2"; shift 2 ;;
+            --help) usage; exit 0 ;;
+            *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
+        esac
+    done
+    if [[ -z "$NAME" ]]; then
+        echo "Error: --name is required" >&2; usage >&2; exit 1
+    fi
+    if [[ -z "$TEXT" && -z "$KEYS" ]]; then
+        echo "Error: --text or --keys required" >&2; usage >&2; exit 1
+    fi
+}
+
+find_pane() {
+    local idx
+    idx=$(tmux list-windows -t "$PREFIX" -F '#{window_index}:#{window_name}' 2>/dev/null | grep ":${1}$" | head -1 | cut -d: -f1)
+    if [[ -z "$idx" ]]; then
+        echo "Error: pane '$1' not found in session '$PREFIX'" >&2
+        exit 1
+    fi
+    echo "$PREFIX:$idx"
+}
+
+parse_args "$@"
+
+TARGET=$(find_pane "$NAME")
+
+if [[ -n "$TEXT" ]]; then
+    tmux send-keys -t "$TARGET" -l "$TEXT"
+fi
+if [[ -n "$KEYS" ]]; then
+    tmux send-keys -t "$TARGET" "$KEYS"
+fi
