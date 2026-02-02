@@ -12,6 +12,7 @@ Run concurrent commands, monitor output, wait for completion, and interact with 
 | Task | Command |
 |------|---------|
 | Start session | `tmux-session create [--prefix NAME]` |
+| Check session exists | `tmux-session exists [--prefix NAME]` |
 | Run command | `tmux-run --name build -- make -j4` |
 | Run in directory | `tmux-run --name build --dir /project -- make` |
 | Restart dead pane | `tmux-run --name build --replace -- make -j4` |
@@ -78,3 +79,4 @@ Names and prefixes must **not** contain ':', '.', '!', '"', '\\', or whitespace 
 | Forgetting to destroy session | Always `tmux-session destroy` when done |
 | Using special chars in names | Stick to alphanumeric and hyphens |
 | Sending input to a dead pane | Check `tmux-list` status before `tmux-send` |
+| Expecting precise timeouts | Timeouts are checked after each poll interval, so actual wait time may exceed `--timeout` by up to one `--poll` period. For precise timeouts, use `--poll 1` |

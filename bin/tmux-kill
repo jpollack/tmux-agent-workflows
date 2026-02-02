@@ -53,7 +53,7 @@ parse_args "$@"
 validate_name "prefix" "$PREFIX" || exit 1
 
 if [[ "$ALL" == true ]]; then
-    if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
+    if ! session_exists "$PREFIX"; then
         echo "Error: session '$PREFIX' does not exist" >&2
         exit 1
     fi

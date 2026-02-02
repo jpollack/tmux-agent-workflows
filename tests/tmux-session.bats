@@ -81,6 +81,39 @@ teardown() {
     tmux has-session -t "$TEST_PREFIX" 2>/dev/null
 }
 
+@test "tmux-session create is not fooled by prefix-matching session" {
+    local longer="${TEST_PREFIX}-extra"
+    tmux-session create --prefix "$longer"
+    # The longer session exists, but TEST_PREFIX itself does not — create should succeed
+    run tmux-session create --prefix "$TEST_PREFIX"
+    [ "$status" -eq 0 ]
+    # Destroy TEST_PREFIX should only destroy TEST_PREFIX, not the longer one
+    run tmux-session destroy --prefix "$TEST_PREFIX"
+    [ "$status" -eq 0 ]
+    # The longer session should still exist
+    tmux list-sessions -F '#{session_name}' | grep -qx "$longer"
+    tmux kill-session -t "$longer" 2>/dev/null || true
+}
+
+@test "tmux-session exists returns 0 when session exists" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    run tmux-session exists --prefix "$TEST_PREFIX"
+    [ "$status" -eq 0 ]
+}
+
+@test "tmux-session exists returns 1 when session missing" {
+    run tmux-session exists --prefix "nonexistent-$$"
+    [ "$status" -eq 1 ]
+}
+
+@test "tmux-session exists uses exact match" {
+    local longer="${TEST_PREFIX}-extra"
+    tmux-session create --prefix "$longer"
+    run tmux-session exists --prefix "$TEST_PREFIX"
+    [ "$status" -eq 1 ]
+    tmux kill-session -t "$longer" 2>/dev/null || true
+}
+
 @test "tmux-session destroy --quiet suppresses output" {
     tmux-session create --prefix "$TEST_PREFIX"
     run tmux-session destroy --prefix "$TEST_PREFIX" --quiet

@@ -75,6 +75,18 @@ teardown() {
     [ -z "$output" ]
 }
 
+@test "tmux-wait --print produces no stdout for killed process" {
+    tmux-run --prefix "$TEST_PREFIX" --name printkill -- bash -c 'trap "" INT; sleep 300'
+    sleep 0.5
+    local pane_pid
+    pane_pid=$(tmux list-windows -t "$TEST_PREFIX" -F '#{window_name}|#{pane_pid}' \
+        | awk -F'|' '$1 == "printkill" {print $2}')
+    kill -9 "$pane_pid"
+    run tmux-wait --prefix "$TEST_PREFIX" --name printkill --timeout 10 --print --quiet
+    [ "$status" -ne 0 ]
+    [ -z "$output" ]
+}
+
 @test "tmux-wait --print outputs exit code to stdout" {
     tmux-run --prefix "$TEST_PREFIX" --name printjob -- bash -c 'exit 42'
     run tmux-wait --prefix "$TEST_PREFIX" --name printjob --timeout 10 --print

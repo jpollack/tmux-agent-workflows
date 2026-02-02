@@ -125,6 +125,21 @@ teardown() {
 }
 
 # Bug #2: JSON injection prevention
+@test "validate_name rejects empty name" {
+    # Source _tmux-common directly to test validate_name in isolation
+    source "$BATS_TEST_DIRNAME/../bin/_tmux-common"
+    run validate_name "name" ""
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot be empty"* ]]
+}
+
+@test "validate_name rejects empty prefix" {
+    source "$BATS_TEST_DIRNAME/../bin/_tmux-common"
+    run validate_name "prefix" ""
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot be empty"* ]]
+}
+
 @test "tmux-run rejects name with double quote" {
     tmux-session create --prefix "$TEST_PREFIX"
     run tmux-run --name 'bad"name' --prefix "$TEST_PREFIX" -- echo hi

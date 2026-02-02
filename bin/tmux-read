@@ -14,7 +14,7 @@ Read output from a named tmux pane.
 Options:
   --name NAME     Target pane name (required)
   --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
-  --last N        Show only last N lines
+  --last N        Show only last N lines (alias: --tail)
   --start N       Skip first N lines
   --grep PATTERN  Wait for fixed string PATTERN to appear in output
   --grep-regex    Treat --grep PATTERN as extended regex instead of fixed string
@@ -48,7 +48,7 @@ parse_args() {
         case "$1" in
             --name) [[ $# -ge 2 ]] || { echo "Error: --name requires a value" >&2; exit 1; }; NAME="$2"; shift 2 ;;
             --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
-            --last) [[ $# -ge 2 ]] || { echo "Error: --last requires a value" >&2; exit 1; }; LAST="$2"; shift 2 ;;
+            --last|--tail) [[ $# -ge 2 ]] || { echo "Error: $1 requires a value" >&2; exit 1; }; LAST="$2"; shift 2 ;;
             --start) [[ $# -ge 2 ]] || { echo "Error: --start requires a value" >&2; exit 1; }; START="$2"; shift 2 ;;
             --grep) [[ $# -ge 2 ]] || { echo "Error: --grep requires a value" >&2; exit 1; }; GREP="$2"; shift 2 ;;
             --grep-regex) GREP_REGEX=true; shift ;;
@@ -85,7 +85,7 @@ apply_filters() {
     if [[ -n "$LAST" ]]; then
         result=$(echo "$result" | tail -n "$LAST")
     fi
-    echo "$result"
+    [[ -n "$result" ]] && echo "$result" || true
 }
 
 if [[ -n "$GREP" ]]; then

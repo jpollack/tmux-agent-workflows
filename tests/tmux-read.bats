@@ -39,6 +39,18 @@ teardown() {
     [[ "$output" != *"line5"* ]]
 }
 
+@test "tmux-read --tail is alias for --last" {
+    local helper="$BATS_TEST_TMPDIR/tailer.sh"
+    printf '#!/bin/bash\nfor i in $(seq 1 20); do echo "tline$i"; done\nsleep 60\n' > "$helper"
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name tailer -- "$helper"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name tailer --tail 5
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"tline20"* ]]
+    [[ "$output" != *"tline5"* ]]
+}
+
 @test "tmux-read --start N skips first N lines" {
     local helper="$BATS_TEST_TMPDIR/starter.sh"
     printf '#!/bin/bash\nfor i in $(seq 1 10); do echo "sline$i"; done\nsleep 60\n' > "$helper"

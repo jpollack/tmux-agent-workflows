@@ -63,7 +63,7 @@ if [[ "$POLL" -le 0 ]]; then
     exit 1
 fi
 
-if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
+if ! session_exists "$PREFIX"; then
     echo "Error: session '$PREFIX' does not exist" >&2
     exit 1
 fi
@@ -83,7 +83,6 @@ while true; do
     if [[ "$dead" == "1" ]]; then
         if [[ -z "$dead_status" ]]; then
             [[ "$QUIET" == true ]] || echo "Pane '$NAME' exited with unknown status (likely killed)" >&2
-            [[ "$PRINT" == true ]] && echo ""
             exit 1
         fi
         [[ "$PRINT" == true ]] && echo "$dead_status"

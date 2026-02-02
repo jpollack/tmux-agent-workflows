@@ -13,6 +13,7 @@ Manage tmux sessions for agent workflows.
 Commands:
   create   Create a new session
   destroy  Destroy a session and all its panes
+  exists   Check if a session exists (exit 0 if yes, 1 if no)
   list     List sessions
 
 Options:
@@ -36,7 +37,7 @@ parse_args() {
     QUIET=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            create|destroy|list) COMMAND="$1"; shift ;;
+            create|destroy|exists|list) COMMAND="$1"; shift ;;
             --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
             --all) ALL=true; shift ;;
             --quiet|-q) QUIET=true; shift ;;
@@ -52,7 +53,7 @@ parse_args() {
 }
 
 cmd_create() {
-    if tmux has-session -t "$PREFIX" 2>/dev/null; then
+    if session_exists "$PREFIX"; then
         echo "Error: session '$PREFIX' already exists" >&2
         exit 1
     fi
@@ -63,12 +64,16 @@ cmd_create() {
 }
 
 cmd_destroy() {
-    if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
+    if ! session_exists "$PREFIX"; then
         echo "Error: session '$PREFIX' does not exist" >&2
         exit 1
     fi
     tmux kill-session -t "$PREFIX"
     [[ "$QUIET" == true ]] || echo "Destroyed session '$PREFIX'"
+}
+
+cmd_exists() {
+    session_exists "$PREFIX"
 }
 
 cmd_list() {
