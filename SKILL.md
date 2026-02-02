@@ -60,7 +60,7 @@ tmux-wait --name subtask2 --timeout 600
 
 ## Naming Rules
 
-Names and prefixes must **not** contain `:`, `.`, or `!` — tmux treats these as target separators. Names must be unique within a session.
+Names and prefixes must **not** contain ':', '.', or '!' — tmux treats these as target separators. Names must be unique within a session.
 
 ## Common Mistakes
 
@@ -70,5 +70,5 @@ Names and prefixes must **not** contain `:`, `.`, or `!` — tmux treats these a
 | Polling in a loop for output | Use `tmux-read --grep PATTERN --timeout N` |
 | Polling in a loop for exit | Use `tmux-wait --name NAME --timeout N` |
 | Forgetting to destroy session | Always `tmux-session destroy` when done |
-| Using `:` or `.` in names | Stick to alphanumeric and hyphens |
+| Using ':' or '.' in names | Stick to alphanumeric and hyphens |
 | Sending input to a dead pane | Check `tmux-list` status before `tmux-send` |
