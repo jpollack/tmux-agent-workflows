@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROG="tmux-wait"
+DEFAULT_PREFIX="agent"
+
+source "$(dirname "$0")/_tmux-common"
+
+usage() {
+    cat <<EOF
+Usage: $PROG --name NAME [options]
+
+Wait for a named tmux pane to exit.
+
+Options:
+  --name NAME       Target pane name (required)
+  --prefix NAME     Session prefix (default: $DEFAULT_PREFIX)
+  --timeout SECS    Max seconds to wait (default: 0 = forever)
+  --poll SECS       Polling interval (default: 2)
+  --help            Show this help
+
+Exit codes:
+  Same as the pane's command exit code, or 124 on timeout.
+
+Examples:
+  $PROG --name build --timeout 300
+  $PROG --name tests --poll 5
+EOF
+}
+
+parse_args() {
+    PREFIX="$DEFAULT_PREFIX"
+    NAME=""
+    TIMEOUT=0
+    POLL=2
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --name) NAME="$2"; shift 2 ;;
+            --prefix) PREFIX="$2"; shift 2 ;;
+            --timeout) TIMEOUT="$2"; shift 2 ;;
+            --poll) POLL="$2"; shift 2 ;;
+            --help) usage; exit 0 ;;
+            *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
+        esac
+    done
+    if [[ -z "$NAME" ]]; then
+        echo "Error: --name is required" >&2; usage >&2; exit 1
+    fi
+}
+
+parse_args "$@"
+validate_name "name" "$NAME" || exit 1
+validate_name "prefix" "$PREFIX" || exit 1
+
+if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
+    echo "Error: session '$PREFIX' does not exist" >&2
+    exit 1
+fi
+
+elapsed=0
+while true; do
+    line=$(tmux list-windows -t "$PREFIX" -F '#{window_name} #{pane_dead} #{pane_dead_status}' 2>/dev/null \
+        | awk -v name="$NAME" '$1 == name {print; exit}')
+
+    if [[ -z "$line" ]]; then
+        echo "Error: pane '$NAME' not found in session '$PREFIX'" >&2
+        exit 1
+    fi
+
+    read -r _ dead dead_status <<< "$line"
+
+    if [[ "$dead" == "1" ]]; then
+        exit "${dead_status:-0}"
+    fi
+
+    if [[ "$TIMEOUT" -gt 0 && "$elapsed" -ge "$TIMEOUT" ]]; then
+        echo "Timeout waiting for '$NAME' after ${TIMEOUT}s" >&2
+        exit 124
+    fi
+
+    sleep "$POLL"
+    elapsed=$((elapsed + POLL))
+done
