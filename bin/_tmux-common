@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Shared functions for tmux-agent-workflows scripts.
+# Source this file; do not execute directly.
+
+find_pane() {
+    local prefix="$1" name="$2"
+    local idx
+    idx=$(tmux list-windows -t "$prefix" -F '#{window_index}:#{window_name}' 2>/dev/null \
+        | awk -F: -v name="$name" '$2 == name {print $1; exit}')
+    if [[ -z "$idx" ]]; then
+        echo "Error: pane '$name' not found in session '$prefix'" >&2
+        return 1
+    fi
+    echo "$prefix:$idx"
+}

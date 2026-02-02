@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "$0")/_tmux-common"
 
 PROG="tmux-send"
 DEFAULT_PREFIX="agent"
@@ -48,19 +49,9 @@ parse_args() {
     fi
 }
 
-find_pane() {
-    local idx
-    idx=$(tmux list-windows -t "$PREFIX" -F '#{window_index}:#{window_name}' 2>/dev/null | grep ":${1}$" | head -1 | cut -d: -f1)
-    if [[ -z "$idx" ]]; then
-        echo "Error: pane '$1' not found in session '$PREFIX'" >&2
-        exit 1
-    fi
-    echo "$PREFIX:$idx"
-}
-
 parse_args "$@"
 
-TARGET=$(find_pane "$NAME")
+TARGET=$(find_pane "$PREFIX" "$NAME")
 
 if [[ -n "$TEXT" ]]; then
     tmux send-keys -t "$TARGET" -l "$TEXT"
