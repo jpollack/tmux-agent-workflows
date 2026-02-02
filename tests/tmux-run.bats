@@ -55,6 +55,22 @@ SCRIPT
     [[ "$output" == *"ARG:foo bar"* ]]
 }
 
+@test "tmux-run --env sets environment variables" {
+    local helper="$BATS_TEST_TMPDIR/envcheck.sh"
+    cat > "$helper" <<'SCRIPT'
+#!/bin/bash
+echo "MY_VAR=$MY_VAR"
+echo "OTHER=$OTHER"
+sleep 60
+SCRIPT
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name envtest --env MY_VAR=hello --env OTHER=world -- "$helper"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name envtest
+    [[ "$output" == *"MY_VAR=hello"* ]]
+    [[ "$output" == *"OTHER=world"* ]]
+}
+
 @test "tmux-run --dir sets working directory" {
     local workdir="$BATS_TEST_TMPDIR/workdir"
     mkdir -p "$workdir"

@@ -15,6 +15,7 @@ Options:
   --name NAME     Target pane name (required)
   --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
   --last N        Show only last N lines
+  --start N       Skip first N lines
   --grep PATTERN  Wait for PATTERN to appear in output
   --timeout SECS  Max seconds to wait for --grep (default: 0 = forever)
   --poll SECS     Polling interval for --grep (default: 2)
@@ -33,6 +34,7 @@ parse_args() {
     PREFIX="$DEFAULT_PREFIX"
     NAME=""
     LAST=""
+    START=""
     GREP=""
     GREP_TIMEOUT=0
     GREP_POLL=2
@@ -41,6 +43,7 @@ parse_args() {
             --name) NAME="$2"; shift 2 ;;
             --prefix) PREFIX="$2"; shift 2 ;;
             --last) LAST="$2"; shift 2 ;;
+            --start) START="$2"; shift 2 ;;
             --grep) GREP="$2"; shift 2 ;;
             --timeout) GREP_TIMEOUT="$2"; shift 2 ;;
             --poll) GREP_POLL="$2"; shift 2 ;;
@@ -64,6 +67,18 @@ strip_output() {
     grep -v '^Pane is dead' | sed -e :a -e '/^[[:space:]]*$/{ $d; N; ba; }'
 }
 
+apply_filters() {
+    local result
+    result=$(strip_output)
+    if [[ -n "$START" ]]; then
+        result=$(echo "$result" | tail -n +"$((START + 1))")
+    fi
+    if [[ -n "$LAST" ]]; then
+        result=$(echo "$result" | tail -n "$LAST")
+    fi
+    echo "$result"
+}
+
 if [[ -n "$GREP" ]]; then
     if [[ "$GREP_POLL" -le 0 ]]; then
         echo "Error: --poll must be positive" >&2
@@ -73,11 +88,7 @@ if [[ -n "$GREP" ]]; then
     while true; do
         OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
         if echo "$OUTPUT" | grep -qF "$GREP"; then
-            if [[ -n "$LAST" ]]; then
-                echo "$OUTPUT" | strip_output | tail -n "$LAST"
-            else
-                echo "$OUTPUT" | strip_output
-            fi
+            echo "$OUTPUT" | apply_filters
             exit 0
         fi
         if [[ "$GREP_TIMEOUT" -gt 0 && "$elapsed" -ge "$GREP_TIMEOUT" ]]; then
@@ -89,9 +100,5 @@ if [[ -n "$GREP" ]]; then
     done
 else
     OUTPUT=$(tmux capture-pane -t "$TARGET" -p -S -1000 -J)
-    if [[ -n "$LAST" ]]; then
-        echo "$OUTPUT" | strip_output | tail -n "$LAST"
-    else
-        echo "$OUTPUT" | strip_output
-    fi
+    echo "$OUTPUT" | apply_filters
 fi

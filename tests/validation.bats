@@ -28,6 +28,20 @@ teardown() {
     [[ "$output" == *"cannot contain"* ]]
 }
 
+@test "tmux-run rejects name with space" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    run tmux-run --prefix "$TEST_PREFIX" --name "has space" -- echo hi
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot contain"* ]]
+}
+
+@test "tmux-run rejects name with tab" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    run tmux-run --prefix "$TEST_PREFIX" --name $'has\ttab' -- echo hi
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot contain"* ]]
+}
+
 @test "tmux-session rejects prefix with colon" {
     run tmux-session create --prefix "bad:prefix"
     [ "$status" -ne 0 ]

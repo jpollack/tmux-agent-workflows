@@ -7,42 +7,61 @@ DEFAULT_PREFIX="agent"
 
 usage() {
     cat <<EOF
-Usage: $PROG --name NAME [options]
+Usage: $PROG (--name NAME | --all) [options]
 
-Kill a named tmux pane and its process.
+Kill a named tmux pane and its process, or kill all panes.
 
 Options:
-  --name NAME     Target pane name (required)
+  --name NAME     Target pane name
+  --all           Kill all panes (except _init)
   --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
   --help          Show this help
 
 Examples:
   $PROG --name server         # Kill the "server" pane
   $PROG --name build          # Kill the "build" pane
+  $PROG --all                 # Kill all panes
 EOF
 }
 
 parse_args() {
     PREFIX="$DEFAULT_PREFIX"
     NAME=""
+    ALL=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --name) NAME="$2"; shift 2 ;;
+            --all) ALL=true; shift ;;
             --prefix) PREFIX="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
     done
-    if [[ -z "$NAME" ]]; then
-        echo "Error: --name is required" >&2; usage >&2; exit 1
+    if [[ "$ALL" == false && -z "$NAME" ]]; then
+        echo "Error: --name or --all is required" >&2; usage >&2; exit 1
+    fi
+    if [[ "$ALL" == true && -n "$NAME" ]]; then
+        echo "Error: --name and --all are mutually exclusive" >&2; exit 1
     fi
 }
 
 parse_args "$@"
 
-validate_name "name" "$NAME" || exit 1
 validate_name "prefix" "$PREFIX" || exit 1
 
-TARGET=$(find_pane "$PREFIX" "$NAME")
-tmux kill-window -t "$TARGET"
-echo "Killed '$NAME' in session '$PREFIX'"
+if [[ "$ALL" == true ]]; then
+    if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
+        echo "Error: session '$PREFIX' does not exist" >&2
+        exit 1
+    fi
+    tmux list-windows -t "$PREFIX" -F '#{window_index}|#{window_name}' 2>/dev/null | while IFS='|' read -r idx name; do
+        [[ "$name" == "_init" ]] && continue
+        tmux kill-window -t "$PREFIX:$idx" 2>/dev/null || true
+    done
+    echo "Killed all panes in session '$PREFIX'"
+else
+    validate_name "name" "$NAME" || exit 1
+    TARGET=$(find_pane "$PREFIX" "$NAME")
+    tmux kill-window -t "$TARGET"
+    echo "Killed '$NAME' in session '$PREFIX'"
+fi

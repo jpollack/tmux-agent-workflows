@@ -46,6 +46,43 @@ teardown() {
     [[ "$output" == *"done-job"*"exited(0)"* ]]
 }
 
+@test "tmux-list --format json outputs JSON lines for running pane" {
+    tmux-run --prefix "$TEST_PREFIX" --name proc1 -- sleep 60
+    sleep 0.3
+    run tmux-list --prefix "$TEST_PREFIX" --format json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"name":"proc1"'* ]]
+    [[ "$output" == *'"status":"running"'* ]]
+}
+
+@test "tmux-list --format json outputs exit_code for exited pane" {
+    tmux-run --prefix "$TEST_PREFIX" --name done1 -- true
+    sleep 1
+    run tmux-list --prefix "$TEST_PREFIX" --format json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"exited"'* ]]
+    [[ "$output" == *'"exit_code":0'* ]]
+}
+
+@test "tmux-list --format invalid fails" {
+    run tmux-list --prefix "$TEST_PREFIX" --format xml
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--format must be"* ]]
+}
+
+@test "tmux-list shows correct status when process is killed" {
+    tmux-run --prefix "$TEST_PREFIX" --name killed -- sleep 300
+    sleep 0.5
+    # Kill the process with SIGTERM via tmux
+    tmux send-keys -t "$TEST_PREFIX:killed" C-c
+    sleep 1
+    run tmux-list --prefix "$TEST_PREFIX"
+    [ "$status" -eq 0 ]
+    # Status field should NOT contain "sleep" (the command name)
+    [[ "$output" == *"killed"*"exited("* ]]
+    [[ "$output" != *"exited(sleep)"* ]]
+}
+
 @test "tmux-list shows exited(1) for failed command" {
     tmux-run --prefix "$TEST_PREFIX" --name fail-job -- false
     sleep 1

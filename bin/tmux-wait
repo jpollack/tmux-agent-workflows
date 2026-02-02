@@ -64,18 +64,21 @@ fi
 
 elapsed=0
 while true; do
-    line=$(tmux list-windows -t "$PREFIX" -F '#{window_name} #{pane_dead} #{pane_dead_status}' 2>/dev/null \
-        | awk -v name="$NAME" '$1 == name {print; exit}')
+    line=$(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null \
+        | awk -F'|' -v name="$NAME" '$1 == name {print; exit}')
 
     if [[ -z "$line" ]]; then
         echo "Error: pane '$NAME' not found in session '$PREFIX'" >&2
         exit 1
     fi
 
-    read -r _ dead dead_status <<< "$line"
+    IFS='|' read -r _ dead dead_status <<< "$line"
 
     if [[ "$dead" == "1" ]]; then
-        exit "${dead_status:-0}"
+        if [[ -z "$dead_status" ]]; then
+            exit 1
+        fi
+        exit "$dead_status"
     fi
 
     if [[ "$TIMEOUT" -gt 0 && "$elapsed" -ge "$TIMEOUT" ]]; then

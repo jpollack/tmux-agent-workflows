@@ -37,6 +37,18 @@ teardown() {
     [ "$status" -ne 0 ]
 }
 
+@test "tmux-wait returns non-zero for killed process" {
+    tmux-run --prefix "$TEST_PREFIX" --name killed -- bash -c 'trap "" INT; sleep 300'
+    sleep 0.5
+    # Get the pane PID and kill it with SIGKILL
+    local pane_pid
+    pane_pid=$(tmux list-windows -t "$TEST_PREFIX" -F '#{window_name}|#{pane_pid}' \
+        | awk -F'|' '$1 == "killed" {print $2}')
+    kill -9 "$pane_pid"
+    run tmux-wait --prefix "$TEST_PREFIX" --name killed --timeout 10
+    [ "$status" -ne 0 ]
+}
+
 @test "tmux-wait rejects non-positive --poll" {
     run tmux-wait --prefix "$TEST_PREFIX" --name nope --poll 0
     [ "$status" -eq 1 ]

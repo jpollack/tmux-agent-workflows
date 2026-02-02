@@ -39,6 +39,33 @@ teardown() {
     [[ "$output" != *"line5"* ]]
 }
 
+@test "tmux-read --start N skips first N lines" {
+    local helper="$BATS_TEST_TMPDIR/starter.sh"
+    printf '#!/bin/bash\nfor i in $(seq 1 10); do echo "sline$i"; done\nsleep 60\n' > "$helper"
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name starter -- "$helper"
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name starter --start 8
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"sline9"* ]]
+    [[ "$output" == *"sline10"* ]]
+    [[ "$output" != *"sline8"* ]]
+}
+
+@test "tmux-read --start with --last combines correctly" {
+    local helper="$BATS_TEST_TMPDIR/combo.sh"
+    printf '#!/bin/bash\nfor i in $(seq 1 10); do echo "cline$i"; done\nsleep 60\n' > "$helper"
+    chmod +x "$helper"
+    tmux-run --prefix "$TEST_PREFIX" --name combo -- "$helper"
+    sleep 1
+    # Skip first 5, then take last 2 of remaining (lines 6-10 -> last 2 = 9,10)
+    run tmux-read --prefix "$TEST_PREFIX" --name combo --start 5 --last 2
+    [ "$status" -eq 0 ]
+    [ "${#lines[@]}" -eq 2 ]
+    [[ "$output" == *"cline9"* ]]
+    [[ "$output" == *"cline10"* ]]
+}
+
 @test "tmux-read fails for missing pane" {
     run tmux-read --prefix "$TEST_PREFIX" --name nonexistent
     [ "$status" -ne 0 ]

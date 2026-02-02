@@ -12,26 +12,37 @@ List named panes in the agent session.
 
 Options:
   --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
+  --format FMT    Output format: text (default) or json
   --help          Show this help
 
-Output format: NAME STATUS COMMAND
+Output format (text): NAME STATUS COMMAND
   STATUS is "running" or "exited(N)" where N is exit code.
 
+Output format (json): one JSON object per line with name, status, command,
+  and exit_code (when exited) fields.
+
 Examples:
-  $PROG                    # List all panes in "agent" session
-  $PROG --prefix myagent   # List panes in "myagent" session
+  $PROG                          # List all panes in "agent" session
+  $PROG --prefix myagent         # List panes in "myagent" session
+  $PROG --format json            # JSON lines output
 EOF
 }
 
 parse_args() {
     PREFIX="$DEFAULT_PREFIX"
+    FORMAT="text"
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --prefix) PREFIX="$2"; shift 2 ;;
+            --format) FORMAT="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
     done
+    if [[ "$FORMAT" != "text" && "$FORMAT" != "json" ]]; then
+        echo "Error: --format must be 'text' or 'json'" >&2
+        exit 1
+    fi
 }
 
 parse_args "$@"
@@ -43,12 +54,21 @@ if ! tmux has-session -t "$PREFIX" 2>/dev/null; then
     exit 0
 fi
 
-tmux list-windows -t "$PREFIX" -F '#{window_name} #{pane_dead} #{pane_dead_status} #{pane_current_command}' 2>/dev/null | while read -r name dead dead_status cmd; do
+tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}|#{pane_current_command}' 2>/dev/null | while IFS='|' read -r name dead dead_status cmd; do
     [[ "$name" == "_init" ]] && continue
     if [[ "$dead" == "1" ]]; then
         status="exited(${dead_status})"
     else
         status="running"
     fi
-    echo "$name $status $cmd"
+    if [[ "$FORMAT" == "json" ]]; then
+        if [[ "$dead" == "1" ]]; then
+            printf '{"name":"%s","status":"exited","exit_code":%s,"command":"%s"}\n' \
+                "$name" "${dead_status:-null}" "$cmd"
+        else
+            printf '{"name":"%s","status":"running","command":"%s"}\n' "$name" "$cmd"
+        fi
+    else
+        echo "$name $status $cmd"
+    fi
 done
