@@ -56,3 +56,12 @@ SCRIPT
     # Clean up helper
     rm -f "$HELPER"
 }
+
+@test "exit detection: run, wait, list shows exited(0)" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-run --prefix "$TEST_PREFIX" --name shortlived -- echo done
+    run tmux-wait --prefix "$TEST_PREFIX" --name shortlived --timeout 10
+    [ "$status" -eq 0 ]
+    run tmux-list --prefix "$TEST_PREFIX"
+    [[ "$output" == *"shortlived"*"exited(0)"* ]]
+}
