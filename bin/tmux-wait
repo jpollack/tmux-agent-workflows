@@ -13,7 +13,8 @@ Usage: $PROG --name NAME [options]
 Wait for a named tmux pane to exit.
 
 Options:
-  --name NAME       Target pane name (required)
+  --name NAME       Target pane name (required unless --all)
+  --all             Wait for all panes to exit
   --prefix NAME     Session prefix (default: $DEFAULT_PREFIX)
   --timeout SECS    Max seconds to wait (default: 0 = forever)
   --poll SECS       Polling interval (default: 2)
@@ -33,6 +34,7 @@ EOF
 parse_args() {
     PREFIX="$DEFAULT_PREFIX"
     NAME=""
+    ALL=false
     TIMEOUT=0
     POLL=2
     QUIET=false
@@ -40,6 +42,7 @@ parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --name) [[ $# -ge 2 ]] || { echo "Error: --name requires a value" >&2; exit 1; }; NAME="$2"; shift 2 ;;
+            --all) ALL=true; shift ;;
             --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
             --timeout) [[ $# -ge 2 ]] || { echo "Error: --timeout requires a value" >&2; exit 1; }; TIMEOUT="$2"; shift 2 ;;
             --poll) [[ $# -ge 2 ]] || { echo "Error: --poll requires a value" >&2; exit 1; }; POLL="$2"; shift 2 ;;
@@ -49,13 +52,18 @@ parse_args() {
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
     done
-    if [[ -z "$NAME" ]]; then
-        echo "Error: --name is required" >&2; usage >&2; exit 1
+    if [[ "$ALL" == false && -z "$NAME" ]]; then
+        echo "Error: --name or --all is required" >&2; usage >&2; exit 1
+    fi
+    if [[ "$ALL" == true && -n "$NAME" ]]; then
+        echo "Error: --name and --all are mutually exclusive" >&2; exit 1
     fi
 }
 
 parse_args "$@"
-validate_name "name" "$NAME" || exit 1
+if [[ "$ALL" == false ]]; then
+    validate_name "name" "$NAME" || exit 1
+fi
 validate_name "prefix" "$PREFIX" || exit 1
 
 if [[ "$POLL" -le 0 ]]; then
@@ -68,33 +76,78 @@ if ! session_exists "$PREFIX"; then
     exit 1
 fi
 
-elapsed=0
-while true; do
-    line=$(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null \
-        | awk -F'|' -v name="$NAME" '$1 == name {print; exit}')
+wait_single() {
+    local elapsed=0
+    while true; do
+        line=$(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null \
+            | awk -F'|' -v name="$NAME" '$1 == name {print; exit}')
 
-    if [[ -z "$line" ]]; then
-        echo "Error: pane '$NAME' not found in session '$PREFIX'" >&2
-        exit 1
-    fi
-
-    IFS='|' read -r _ dead dead_status <<< "$line"
-
-    if [[ "$dead" == "1" ]]; then
-        if [[ -z "$dead_status" ]]; then
-            [[ "$QUIET" == true ]] || echo "Pane '$NAME' exited with unknown status (likely killed)" >&2
-            exit 1
+        if [[ -z "$line" ]]; then
+            echo "Error: pane '$NAME' not found in session '$PREFIX'" >&2
+            return 1
         fi
-        [[ "$PRINT" == true ]] && echo "$dead_status"
-        exit "$dead_status"
-    fi
 
-    if [[ "$TIMEOUT" -gt 0 && "$elapsed" -ge "$TIMEOUT" ]]; then
-        [[ "$QUIET" == true ]] || echo "Timeout waiting for '$NAME' after ${TIMEOUT}s" >&2
-        [[ "$PRINT" == true ]] && echo "124"
-        exit 124
-    fi
+        IFS='|' read -r _ dead dead_status <<< "$line"
 
-    sleep "$POLL"
-    elapsed=$((elapsed + POLL))
-done
+        if [[ "$dead" == "1" ]]; then
+            if [[ -z "$dead_status" ]]; then
+                [[ "$QUIET" == true ]] || echo "Pane '$NAME' exited with unknown status (likely killed)" >&2
+                return 1
+            fi
+            [[ "$PRINT" == true ]] && echo "$dead_status"
+            return "$dead_status"
+        fi
+
+        if [[ "$TIMEOUT" -gt 0 && "$elapsed" -ge "$TIMEOUT" ]]; then
+            [[ "$QUIET" == true ]] || echo "Timeout waiting for '$NAME' after ${TIMEOUT}s" >&2
+            [[ "$PRINT" == true ]] && echo "124"
+            return 124
+        fi
+
+        sleep "$POLL"
+        elapsed=$((elapsed + POLL))
+    done
+}
+
+wait_all() {
+    local elapsed=0 max_exit=0
+    while true; do
+        local all_dead=true
+        max_exit=0
+        while IFS='|' read -r name dead dead_status; do
+            [[ "$name" == "_init" ]] && continue
+            if [[ "$dead" != "1" ]]; then
+                all_dead=false
+                break
+            fi
+            if [[ -z "$dead_status" ]]; then
+                dead_status=1
+            fi
+            if [[ "$dead_status" -gt "$max_exit" ]]; then
+                max_exit="$dead_status"
+            fi
+        done < <(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null)
+
+        if [[ "$all_dead" == true ]]; then
+            [[ "$PRINT" == true ]] && echo "$max_exit"
+            return "$max_exit"
+        fi
+
+        if [[ "$TIMEOUT" -gt 0 && "$elapsed" -ge "$TIMEOUT" ]]; then
+            [[ "$QUIET" == true ]] || echo "Timeout waiting for all panes after ${TIMEOUT}s" >&2
+            [[ "$PRINT" == true ]] && echo "124"
+            return 124
+        fi
+
+        sleep "$POLL"
+        elapsed=$((elapsed + POLL))
+    done
+}
+
+if [[ "$ALL" == true ]]; then
+    wait_all
+    exit $?
+else
+    wait_single
+    exit $?
+fi

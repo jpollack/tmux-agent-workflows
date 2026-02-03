@@ -91,6 +91,32 @@ teardown() {
     [[ "$output" == *"fail-job"*"exited(1)"* ]]
 }
 
+@test "tmux-list --filter running shows only running panes" {
+    tmux-run --prefix "$TEST_PREFIX" --name alive -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name dead -- true
+    sleep 1
+    run tmux-list --prefix "$TEST_PREFIX" --filter running
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"alive"* ]]
+    [[ "$output" != *"dead"* ]]
+}
+
+@test "tmux-list --filter exited shows only exited panes" {
+    tmux-run --prefix "$TEST_PREFIX" --name alive -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name dead -- true
+    sleep 1
+    run tmux-list --prefix "$TEST_PREFIX" --filter exited
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"alive"* ]]
+    [[ "$output" == *"dead"* ]]
+}
+
+@test "tmux-list --filter invalid fails" {
+    run tmux-list --prefix "$TEST_PREFIX" --filter unknown
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--filter must be"* ]]
+}
+
 @test "tmux-list --format json produces valid JSON for each line" {
     tmux-run --prefix "$TEST_PREFIX" --name jsontest -- sleep 60
     sleep 0.3

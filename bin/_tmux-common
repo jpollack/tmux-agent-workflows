@@ -20,6 +20,10 @@ validate_name() {
         echo "Error: $label cannot be empty" >&2
         return 1
     fi
+    if [[ "$value" == -* ]]; then
+        echo "Error: $label cannot start with '-'" >&2
+        return 1
+    fi
     if [[ "$value" =~ [:.!\"\\[:space:]] ]]; then
         echo "Error: $label cannot contain ':', '.', '!', '\"', '\\', or whitespace" >&2
         return 1
@@ -27,5 +31,5 @@ validate_name() {
 }
 
 session_exists() {
-    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -qx "$1"
+    tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -qxF -- "$1"
 }

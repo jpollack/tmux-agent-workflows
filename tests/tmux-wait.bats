@@ -107,3 +107,40 @@ teardown() {
     [ "$status" -eq 124 ]
     [[ "$output" == "124" ]]
 }
+
+@test "tmux-wait --all waits for all panes" {
+    tmux-run --prefix "$TEST_PREFIX" --name task1 -- true
+    tmux-run --prefix "$TEST_PREFIX" --name task2 -- true
+    sleep 1
+    run tmux-wait --prefix "$TEST_PREFIX" --all --timeout 10
+    [ "$status" -eq 0 ]
+}
+
+@test "tmux-wait --all returns highest exit code" {
+    tmux-run --prefix "$TEST_PREFIX" --name ok -- true
+    tmux-run --prefix "$TEST_PREFIX" --name fail -- bash -c 'exit 3'
+    sleep 1
+    run tmux-wait --prefix "$TEST_PREFIX" --all --timeout 10
+    [ "$status" -eq 3 ]
+}
+
+@test "tmux-wait --all times out if pane still running" {
+    tmux-run --prefix "$TEST_PREFIX" --name slow -- sleep 300
+    run tmux-wait --prefix "$TEST_PREFIX" --all --timeout 2 --poll 1
+    [ "$status" -eq 124 ]
+}
+
+@test "tmux-wait --all and --name are mutually exclusive" {
+    run tmux-wait --prefix "$TEST_PREFIX" --all --name foo
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "tmux-wait --all --print outputs highest exit code" {
+    tmux-run --prefix "$TEST_PREFIX" --name a -- true
+    tmux-run --prefix "$TEST_PREFIX" --name b -- bash -c 'exit 5'
+    sleep 1
+    run tmux-wait --prefix "$TEST_PREFIX" --all --timeout 10 --print
+    [ "$status" -eq 5 ]
+    [[ "$output" == "5" ]]
+}

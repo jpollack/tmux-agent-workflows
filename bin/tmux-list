@@ -11,9 +11,10 @@ Usage: $PROG [options]
 List named panes in the agent session.
 
 Options:
-  --prefix NAME   Session prefix (default: $DEFAULT_PREFIX)
-  --format FMT    Output format: text (default) or json
-  --help          Show this help
+  --prefix NAME    Session prefix (default: $DEFAULT_PREFIX)
+  --format FMT     Output format: text (default) or json
+  --filter STATE   Filter by state: running or exited
+  --help           Show this help
 
 Output format (text): NAME STATUS COMMAND
   STATUS is "running" or "exited(N)" where N is exit code.
@@ -31,16 +32,22 @@ EOF
 parse_args() {
     PREFIX="$DEFAULT_PREFIX"
     FORMAT="text"
+    FILTER=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
             --format) [[ $# -ge 2 ]] || { echo "Error: --format requires a value" >&2; exit 1; }; FORMAT="$2"; shift 2 ;;
+            --filter) [[ $# -ge 2 ]] || { echo "Error: --filter requires a value" >&2; exit 1; }; FILTER="$2"; shift 2 ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
     done
     if [[ "$FORMAT" != "text" && "$FORMAT" != "json" ]]; then
         echo "Error: --format must be 'text' or 'json'" >&2
+        exit 1
+    fi
+    if [[ -n "$FILTER" && "$FILTER" != "running" && "$FILTER" != "exited" ]]; then
+        echo "Error: --filter must be 'running' or 'exited'" >&2
         exit 1
     fi
 }
@@ -56,6 +63,10 @@ fi
 
 tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}|#{pane_current_command}' 2>/dev/null | while IFS='|' read -r name dead dead_status cmd; do
     [[ "$name" == "_init" ]] && continue
+    if [[ -n "$FILTER" ]]; then
+        if [[ "$FILTER" == "running" && "$dead" == "1" ]]; then continue; fi
+        if [[ "$FILTER" == "exited" && "$dead" != "1" ]]; then continue; fi
+    fi
     if [[ "$dead" == "1" ]]; then
         status="exited(${dead_status})"
     else

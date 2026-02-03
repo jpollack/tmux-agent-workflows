@@ -80,7 +80,7 @@ cmd_list() {
     if [[ "$ALL" == true ]]; then
         tmux list-sessions -F '#{session_name}' 2>/dev/null || true
     else
-        tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -x "$PREFIX" || true
+        tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -xF -- "$PREFIX" || true
     fi
 }
 

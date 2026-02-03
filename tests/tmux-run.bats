@@ -107,6 +107,26 @@ SCRIPT
     [[ "$output" == *"still running"* ]]
 }
 
+@test "tmux-run pane name with regex chars does not falsely match" {
+    # 'a*b' as a regex would match 'ab', but with fixed-string grep it should not
+    tmux-run --prefix "$TEST_PREFIX" --name ab -- sleep 60
+    run tmux-run --prefix "$TEST_PREFIX" --name "a*b" -- sleep 60
+    # Both names should coexist — the second should succeed (not "already exists")
+    [ "$status" -eq 0 ]
+}
+
+@test "tmux-run --replace clears old scrollback" {
+    tmux-run --prefix "$TEST_PREFIX" --name clearme -- echo OLD_OUTPUT_MARKER
+    sleep 1
+    # Pane is dead now; replace it
+    tmux-run --prefix "$TEST_PREFIX" --name clearme --replace -- echo NEW_OUTPUT_ONLY
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name clearme
+    # Old output should be gone
+    [[ "$output" != *"OLD_OUTPUT_MARKER"* ]]
+    [[ "$output" == *"NEW_OUTPUT_ONLY"* ]]
+}
+
 @test "tmux-run --quiet suppresses output" {
     run tmux-run --prefix "$TEST_PREFIX" --name quietjob --quiet -- echo hi
     [ "$status" -eq 0 ]

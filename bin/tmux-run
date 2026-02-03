@@ -60,7 +60,7 @@ parse_args() {
 }
 
 pane_exists() {
-    tmux list-windows -t "$PREFIX" -F '#{window_name}' 2>/dev/null | grep -qx "$1"
+    tmux list-windows -t "$PREFIX" -F '#{window_name}' 2>/dev/null | grep -qxF -- "$1"
 }
 
 parse_args "$@"
@@ -96,6 +96,7 @@ fi
 
 if [[ "$REPLACE" == true ]] && pane_exists "$NAME"; then
     # Respawn the existing dead pane with the new command
+    tmux clear-history -t "$PREFIX:$NAME"
     if [[ -n "$DIR" ]]; then
         tmux respawn-pane -k -t "$PREFIX:$NAME" -c "$DIR" "${CMD[@]}"
     else

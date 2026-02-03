@@ -22,10 +22,14 @@ Run concurrent commands, monitor output, wait for completion, and interact with 
 | Wait for regex | `tmux-read --name build --grep "OK\|DONE" --grep-regex --timeout 60` |
 | Wait for disappearance | `tmux-read --name build --grep "COMPILING" --grep-invert --timeout 60` |
 | Wait for exit | `tmux-wait --name build --timeout 300 --poll 5` |
+| Wait for all panes | `tmux-wait --all --timeout 300` |
 | Wait and print code | `tmux-wait --name build --timeout 300 --print` |
 | Send input | `tmux-send --name repl --text "quit" --keys Enter` |
 | Send Ctrl-C | `tmux-send --name server --keys C-c` |
 | List panes | `tmux-list` |
+| List as JSON | `tmux-list --format json` |
+| List running only | `tmux-list --filter running` |
+| List exited only | `tmux-list --filter exited` |
 | List all sessions | `tmux-session list --all` |
 | Kill pane | `tmux-kill --name build` |
 | End session | `tmux-session destroy` |
@@ -58,16 +62,35 @@ Run Claude in isolated tmux panes for parallel subtasks:
 tmux-run --name subtask1 -- claude -p "do something" --output-file /tmp/result1.txt
 tmux-run --name subtask2 -- claude -p "do other thing" --output-file /tmp/result2.txt
 
-# Wait for both
+# Wait for all panes at once
+tmux-wait --all --timeout 600
+
+# Or wait individually (order doesn't matter — already-exited panes return immediately)
 tmux-wait --name subtask1 --timeout 600
 tmux-wait --name subtask2 --timeout 600
+
+# Check exit codes and collect output
+for name in subtask1 subtask2; do
+  tmux-wait --name "$name" --timeout 600 --print
+  # exit code is in $? and also printed to stdout with --print
+done
 
 # Read results from output files
 ```
 
 ## Naming Rules
 
-Names and prefixes must **not** contain ':', '.', '!', '"', '\\', or whitespace — tmux treats these as target separators, quotes and backslashes break JSON output, and whitespace breaks field parsing. Names must be unique within a session.
+Names and prefixes must **not** start with '-' or contain ':', '.', '!', '"', '\\', or whitespace — tmux treats these as target separators, quotes and backslashes break JSON output, and whitespace breaks field parsing. Names must be unique within a session.
+
+## Cleanup on Error
+
+Use a trap to ensure the session is destroyed even if the script fails:
+
+```bash
+cleanup() { tmux-session destroy --quiet 2>/dev/null || true; }
+trap cleanup EXIT
+tmux-session create
+```
 
 ## Common Mistakes
 
@@ -80,3 +103,5 @@ Names and prefixes must **not** contain ':', '.', '!', '"', '\\', or whitespace 
 | Using special chars in names | Stick to alphanumeric and hyphens |
 | Sending input to a dead pane | Check `tmux-list` status before `tmux-send` |
 | Expecting precise timeouts | Timeouts are checked after each poll interval, so actual wait time may exceed `--timeout` by up to one `--poll` period. For precise timeouts, use `--poll 1` |
+| Using bare `bash` as command | `tmux-run --name x -- bash` starts a non-interactive shell that may exit immediately. Use `bash -c '...'` or `bash -i` instead |
+| Missing output from long commands | `tmux-read` captures 1000 lines by default. For commands producing more output, use `--history N` with a larger value, or `--last N` to get only recent lines |

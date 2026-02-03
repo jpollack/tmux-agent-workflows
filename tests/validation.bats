@@ -147,6 +147,20 @@ teardown() {
     [[ "$output" == *"cannot contain"* ]]
 }
 
+@test "validate_name rejects name starting with dash" {
+    source "$BATS_TEST_DIRNAME/../bin/_tmux-common"
+    run validate_name "name" "-verbose"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot start with '-'"* ]]
+}
+
+@test "validate_name rejects prefix starting with dash" {
+    source "$BATS_TEST_DIRNAME/../bin/_tmux-common"
+    run validate_name "prefix" "-myprefix"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"cannot start with '-'"* ]]
+}
+
 @test "tmux-run rejects name with backslash" {
     tmux-session create --prefix "$TEST_PREFIX"
     run tmux-run --name 'bad\name' --prefix "$TEST_PREFIX" -- echo hi
