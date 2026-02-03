@@ -7,6 +7,30 @@ description: Use when running concurrent commands, background processes, or para
 
 Run concurrent commands, monitor output, wait for completion, and interact with processes via tmux.
 
+## Quick Start
+
+```bash
+# Create session
+tmux-session create
+
+# Run parallel tasks
+tmux-run --name build -- make -j8
+tmux-run --name lint -- npm run lint
+tmux-run --name test -- npm test
+
+# Wait for all to complete
+tmux-wait --all --timeout 300
+
+# Check results
+tmux-list
+
+# Read any failures
+tmux-read --name build --last 50
+
+# Cleanup
+tmux-session destroy
+```
+
 ## Quick Reference
 
 | Task | Command |
@@ -30,7 +54,12 @@ Run concurrent commands, monitor output, wait for completion, and interact with 
 | List as JSON | `tmux-list --format json` |
 | List running only | `tmux-list --filter running` |
 | List exited only | `tmux-list --filter exited` |
+| Count panes | `tmux-list --count` |
+| Count running | `tmux-list --filter running --count` |
 | List all sessions | `tmux-session list --all` |
+| Session status | `tmux-session status` |
+| Status as JSON | `tmux-session status --format json` |
+| Set env vars | `tmux-run --name build --env CI=true --env DEBUG=1 -- make` |
 | Kill pane | `tmux-kill --name build` |
 | End session | `tmux-session destroy` |
 
@@ -53,6 +82,26 @@ tmux-session create
 5. **Check status** with `tmux-list` — shows `running` or `exited(N)` per pane
 6. **Interact** with `tmux-send --name repl --text "input" --keys Enter`
 7. **Cleanup**: `tmux-kill --name NAME` per pane, then `tmux-session destroy`
+
+### Waiting for a Process to Be Ready
+
+After starting a process, wait for a readiness indicator before proceeding:
+
+```bash
+tmux-run --name server -- ./start-server.sh
+tmux-read --name server --grep "Listening on port" --timeout 30
+# Server is now ready
+```
+
+### Environment Variables
+
+Pass environment variables to commands with `--env KEY=VALUE` (repeatable):
+
+```bash
+tmux-run --name ci --env CI=true --env NODE_ENV=test -- npm test
+```
+
+Note: `--env` flags must appear before `--`.
 
 ## Spawning Subagents
 
@@ -105,3 +154,81 @@ tmux-session create
 | Expecting precise timeouts | Timeouts are checked after each poll interval, so actual wait time may exceed `--timeout` by up to one `--poll` period. For precise timeouts, use `--poll 1` |
 | Using bare `bash` as command | `tmux-run --name x -- bash` starts a non-interactive shell that may exit immediately. Use `bash -c '...'` or `bash -i` instead |
 | Missing output from long commands | `tmux-read` captures 1000 lines by default. For commands producing more output, use `--history N` with a larger value, or `--last N` to get only recent lines |
+
+## Troubleshooting
+
+### "session does not exist"
+Run `tmux-session create` before using other commands. Each workflow starts with session creation.
+
+### "pane not found"
+Check pane names with `tmux-list`. Names are case-sensitive and must match exactly.
+
+### Output is truncated
+Use `--history N` with a larger value (default 1000). For very long output, pipe through `wc -l` first to understand the scale.
+
+### --dir appears to be ignored
+The directory must exist. Non-existent directories now cause an error (previously tmux silently fell back to CWD).
+
+### Process appears stuck
+Use `tmux-list` to check if status is `running` or `exited(N)`. If running but unresponsive, try `tmux-send --name X --keys C-c`.
+
+### tmux-read --grep never matches
+- Check if the pattern has regex special chars - use `--grep-regex` for regex, or escape for fixed string
+- Check if the output uses ANSI colors that interfere with matching
+- Try `tmux-read --name X --last 50` to see actual output
+
+## Agent Workflow Examples
+
+### Parallel Code Analysis
+
+```bash
+tmux-session create
+tmux-run --name lint -- eslint src/ --format json > /tmp/lint.json
+tmux-run --name types -- tsc --noEmit 2>&1 > /tmp/types.txt
+tmux-run --name tests -- npm test 2>&1 > /tmp/tests.txt
+
+tmux-wait --all --timeout 300
+
+# Collect results
+cat /tmp/lint.json /tmp/types.txt /tmp/tests.txt
+tmux-session destroy
+```
+
+### Long-Running Server with Health Check
+
+```bash
+tmux-session create
+tmux-run --name server -- npm start
+
+# Wait for server ready
+tmux-read --name server --grep "Server listening" --timeout 60
+
+# Run tests against server
+tmux-run --name e2e -- npm run test:e2e
+tmux-wait --name e2e --timeout 300
+
+# Cleanup
+tmux-send --name server --keys C-c
+tmux-wait --name server --timeout 10
+tmux-session destroy
+```
+
+### Spawning Claude Subagents
+
+```bash
+tmux-session create --prefix parallel-agents
+
+# Dispatch independent analysis tasks
+tmux-run --prefix parallel-agents --name analyze-api -- \
+    claude -p "Analyze src/api for security issues" --output-file /tmp/api-analysis.md
+tmux-run --prefix parallel-agents --name analyze-db -- \
+    claude -p "Review database queries for N+1 problems" --output-file /tmp/db-analysis.md
+
+# Wait for both
+tmux-wait --prefix parallel-agents --all --timeout 600
+
+# Aggregate results
+cat /tmp/api-analysis.md /tmp/db-analysis.md
+
+tmux-session destroy --prefix parallel-agents
+```

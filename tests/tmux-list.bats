@@ -127,3 +127,45 @@ teardown() {
         echo "$line" | python3 -c "import sys,json; json.load(sys.stdin)"
     done <<< "$output"
 }
+
+@test "tmux-list --count returns total pane count" {
+    tmux-run --prefix "$TEST_PREFIX" --name pane1 -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name pane2 -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name pane3 -- true
+    sleep 1
+    run tmux-list --prefix "$TEST_PREFIX" --count
+    [ "$status" -eq 0 ]
+    [ "$output" -eq 3 ]
+}
+
+@test "tmux-list --count --filter running returns running count" {
+    tmux-run --prefix "$TEST_PREFIX" --name alive1 -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name alive2 -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name dead1 -- true
+    sleep 1
+    run tmux-list --prefix "$TEST_PREFIX" --filter running --count
+    [ "$status" -eq 0 ]
+    [ "$output" -eq 2 ]
+}
+
+@test "tmux-list --count --filter exited returns exited count" {
+    tmux-run --prefix "$TEST_PREFIX" --name alive -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name dead1 -- true
+    tmux-run --prefix "$TEST_PREFIX" --name dead2 -- false
+    sleep 1
+    run tmux-list --prefix "$TEST_PREFIX" --filter exited --count
+    [ "$status" -eq 0 ]
+    [ "$output" -eq 2 ]
+}
+
+@test "tmux-list --count returns 0 for empty session" {
+    run tmux-list --prefix "$TEST_PREFIX" --count
+    [ "$status" -eq 0 ]
+    [ "$output" -eq 0 ]
+}
+
+@test "tmux-list --count returns 0 for non-existent session" {
+    run tmux-list --prefix "nonexistent-$$" --count
+    [ "$status" -eq 0 ]
+    [ "$output" -eq 0 ]
+}

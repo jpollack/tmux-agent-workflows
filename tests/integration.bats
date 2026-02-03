@@ -65,3 +65,40 @@ SCRIPT
     run tmux-list --prefix "$TEST_PREFIX"
     [[ "$output" == *"shortlived"*"exited(0)"* ]]
 }
+
+@test "parallel tasks with different exit codes" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-run --prefix "$TEST_PREFIX" --name ok -- true
+    tmux-run --prefix "$TEST_PREFIX" --name fail1 -- bash -c 'exit 1'
+    tmux-run --prefix "$TEST_PREFIX" --name fail5 -- bash -c 'exit 5'
+    sleep 1
+    run tmux-wait --prefix "$TEST_PREFIX" --all --timeout 10
+    [ "$status" -eq 5 ]  # Highest exit code
+}
+
+@test "environment variables are set correctly" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-run --prefix "$TEST_PREFIX" --name envcheck --env MYVAR=hello --env OTHER=world -- bash -c 'echo $MYVAR $OTHER'
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name envcheck
+    [[ "$output" == *"hello world"* ]]
+}
+
+@test "session status tracks multiple pane states" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-run --prefix "$TEST_PREFIX" --name running1 -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name running2 -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name success -- true
+    tmux-run --prefix "$TEST_PREFIX" --name fail -- false
+    sleep 1
+    run tmux-session status --prefix "$TEST_PREFIX" --format json
+    [ "$status" -eq 0 ]
+    echo "$output" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['total'] == 4, f'expected 4, got {d[\"total\"]}'
+assert d['running'] == 2, f'expected 2 running, got {d[\"running\"]}'
+assert d['exited'] == 2, f'expected 2 exited, got {d[\"exited\"]}'
+assert d['failed'] == 1, f'expected 1 failed, got {d[\"failed\"]}'
+"
+}

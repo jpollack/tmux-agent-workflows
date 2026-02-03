@@ -120,3 +120,47 @@ teardown() {
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
+
+@test "tmux-session status shows pane counts" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-run --prefix "$TEST_PREFIX" --name running -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name exited -- true
+    tmux-run --prefix "$TEST_PREFIX" --name failed -- false
+    sleep 1
+    run tmux-session status --prefix "$TEST_PREFIX"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Session: $TEST_PREFIX"* ]]
+    [[ "$output" == *"Total panes: 3"* ]]
+    [[ "$output" == *"Running: 1"* ]]
+    [[ "$output" == *"Exited: 2"* ]]
+    [[ "$output" == *"failed: 1"* ]]
+}
+
+@test "tmux-session status --format json outputs valid JSON" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-run --prefix "$TEST_PREFIX" --name task1 -- sleep 60
+    tmux-run --prefix "$TEST_PREFIX" --name task2 -- true
+    sleep 1
+    run tmux-session status --prefix "$TEST_PREFIX" --format json
+    [ "$status" -eq 0 ]
+    echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['total']==2; assert d['running']==1; assert d['exited']==1"
+}
+
+@test "tmux-session status fails if session missing" {
+    run tmux-session status --prefix "nonexistent-$$"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"does not exist"* ]]
+}
+
+@test "tmux-session status with empty session shows zero counts" {
+    tmux-session create --prefix "$TEST_PREFIX"
+    run tmux-session status --prefix "$TEST_PREFIX"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Total panes: 0"* ]]
+}
+
+@test "tmux-session --format invalid fails" {
+    run tmux-session status --prefix "$TEST_PREFIX" --format xml
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--format must be"* ]]
+}

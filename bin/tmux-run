@@ -74,6 +74,11 @@ if ! session_exists "$PREFIX"; then
     exit 1
 fi
 
+if [[ -n "$DIR" && ! -d "$DIR" ]]; then
+    echo "Error: directory '$DIR' does not exist" >&2
+    exit 1
+fi
+
 if pane_exists "$NAME"; then
     if [[ "$REPLACE" == true ]]; then
         # Check if pane is dead before replacing

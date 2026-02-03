@@ -132,3 +132,9 @@ SCRIPT
     [ "$status" -eq 0 ]
     [ -z "$output" ]
 }
+
+@test "tmux-run rejects non-existent --dir" {
+    run tmux-run --prefix "$TEST_PREFIX" --name baddir --dir /nonexistent/path/that/does/not/exist -- echo hi
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"does not exist"* ]]
+}

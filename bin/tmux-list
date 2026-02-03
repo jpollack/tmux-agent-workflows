@@ -14,6 +14,7 @@ Options:
   --prefix NAME    Session prefix (default: $DEFAULT_PREFIX)
   --format FMT     Output format: text (default) or json
   --filter STATE   Filter by state: running or exited
+  --count          Output only the count of matching panes
   --help           Show this help
 
 Output format (text): NAME STATUS COMMAND
@@ -33,11 +34,13 @@ parse_args() {
     PREFIX="$DEFAULT_PREFIX"
     FORMAT="text"
     FILTER=""
+    COUNT=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
             --format) [[ $# -ge 2 ]] || { echo "Error: --format requires a value" >&2; exit 1; }; FORMAT="$2"; shift 2 ;;
             --filter) [[ $# -ge 2 ]] || { echo "Error: --filter requires a value" >&2; exit 1; }; FILTER="$2"; shift 2 ;;
+            --count) COUNT=true; shift ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
         esac
@@ -58,6 +61,23 @@ source "$(dirname "$0")/_tmux-common"
 validate_name "prefix" "$PREFIX" || exit 1
 
 if ! session_exists "$PREFIX"; then
+    if [[ "$COUNT" == true ]]; then
+        echo 0
+    fi
+    exit 0
+fi
+
+if [[ "$COUNT" == true ]]; then
+    count=0
+    while IFS='|' read -r name dead dead_status cmd; do
+        [[ "$name" == "_init" ]] && continue
+        if [[ -n "$FILTER" ]]; then
+            if [[ "$FILTER" == "running" && "$dead" == "1" ]]; then continue; fi
+            if [[ "$FILTER" == "exited" && "$dead" != "1" ]]; then continue; fi
+        fi
+        ((count++)) || true
+    done < <(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}|#{pane_current_command}' 2>/dev/null)
+    echo "$count"
     exit 0
 fi
 

@@ -15,10 +15,12 @@ Commands:
   destroy  Destroy a session and all its panes
   exists   Check if a session exists (exit 0 if yes, 1 if no)
   list     List sessions
+  status   Show session health (pane counts)
 
 Options:
   --prefix NAME   Session name prefix (default: $DEFAULT_PREFIX)
   --all           List all tmux sessions (with 'list' command)
+  --format FMT    Output format: text (default) or json (with 'status' command)
   --quiet, -q     Suppress informational output
   --help          Show this help
 
@@ -35,11 +37,13 @@ parse_args() {
     COMMAND=""
     ALL=false
     QUIET=false
+    FORMAT="text"
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            create|destroy|exists|list) COMMAND="$1"; shift ;;
+            create|destroy|exists|list|status) COMMAND="$1"; shift ;;
             --prefix) [[ $# -ge 2 ]] || { echo "Error: --prefix requires a value" >&2; exit 1; }; PREFIX="$2"; shift 2 ;;
             --all) ALL=true; shift ;;
+            --format) [[ $# -ge 2 ]] || { echo "Error: --format requires a value" >&2; exit 1; }; FORMAT="$2"; shift 2 ;;
             --quiet|-q) QUIET=true; shift ;;
             --help) usage; exit 0 ;;
             *) echo "Error: unknown argument '$1'" >&2; usage >&2; exit 1 ;;
@@ -48,6 +52,10 @@ parse_args() {
     if [[ -z "$COMMAND" ]]; then
         echo "Error: command required" >&2
         usage >&2
+        exit 1
+    fi
+    if [[ "$FORMAT" != "text" && "$FORMAT" != "json" ]]; then
+        echo "Error: --format must be 'text' or 'json'" >&2
         exit 1
     fi
 }
@@ -81,6 +89,36 @@ cmd_list() {
         tmux list-sessions -F '#{session_name}' 2>/dev/null || true
     else
         tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -xF -- "$PREFIX" || true
+    fi
+}
+
+cmd_status() {
+    if ! session_exists "$PREFIX"; then
+        echo "Error: session '$PREFIX' does not exist" >&2
+        exit 1
+    fi
+    local total=0 running=0 exited=0 failed=0
+    while IFS='|' read -r name dead dead_status; do
+        [[ "$name" == "_init" ]] && continue
+        ((total++)) || true
+        if [[ "$dead" == "1" ]]; then
+            ((exited++)) || true
+            if [[ -n "$dead_status" && "$dead_status" != "0" ]]; then
+                ((failed++)) || true
+            fi
+        else
+            ((running++)) || true
+        fi
+    done < <(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null)
+
+    if [[ "$FORMAT" == "json" ]]; then
+        printf '{"session":"%s","total":%d,"running":%d,"exited":%d,"failed":%d}\n' \
+            "$PREFIX" "$total" "$running" "$exited" "$failed"
+    else
+        echo "Session: $PREFIX"
+        echo "Total panes: $total"
+        echo "Running: $running"
+        echo "Exited: $exited (failed: $failed)"
     fi
 }
 
