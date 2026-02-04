@@ -120,7 +120,7 @@ SCRIPT
 
 @test "tmux-read strips Pane is dead line" {
     tmux-run --prefix "$TEST_PREFIX" --name deadpane -- echo "DEADTEST"
-    sleep 1
+    sleep 2  # Allow output to be captured
     run tmux-read --prefix "$TEST_PREFIX" --name deadpane
     [ "$status" -eq 0 ]
     [[ "$output" == *"DEADTEST"* ]]

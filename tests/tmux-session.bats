@@ -126,7 +126,7 @@ teardown() {
     tmux-run --prefix "$TEST_PREFIX" --name running -- sleep 60
     tmux-run --prefix "$TEST_PREFIX" --name exited -- true
     tmux-run --prefix "$TEST_PREFIX" --name failed -- false
-    sleep 1
+    sleep 2
     run tmux-session status --prefix "$TEST_PREFIX"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Session: $TEST_PREFIX"* ]]

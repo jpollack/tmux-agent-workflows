@@ -33,3 +33,38 @@ validate_name() {
 session_exists() {
     tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -qxF -- "$1"
 }
+
+# Get pane info with retry for dead_status race condition.
+# When a pane dies, there's a brief window where pane_dead=1 but
+# pane_dead_status is empty. This function retries up to 10 times
+# (2 seconds total) to allow tmux to populate the status.
+# Output format: name|dead|dead_status|cmd (one line per pane)
+get_pane_info() {
+    local prefix="$1"
+    local retries=0 max_retries=20
+    local output status_pending
+
+    while [[ $retries -lt $max_retries ]]; do
+        status_pending=false
+        output=$(tmux list-windows -t "$prefix" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}|#{pane_current_command}' 2>/dev/null)
+
+        # Check if any dead pane is missing its status
+        while IFS='|' read -r name dead dead_status cmd; do
+            if [[ "$dead" == "1" && -z "$dead_status" ]]; then
+                status_pending=true
+                break
+            fi
+        done <<< "$output"
+
+        if [[ "$status_pending" == false ]]; then
+            echo "$output"
+            return 0
+        fi
+
+        retries=$((retries + 1))
+        sleep 0.1
+    done
+
+    # After max retries, return what we have
+    echo "$output"
+}

@@ -85,7 +85,7 @@ teardown() {
 
 @test "tmux-list shows exited(1) for failed command" {
     tmux-run --prefix "$TEST_PREFIX" --name fail-job -- false
-    sleep 1
+    sleep 2
     run tmux-list --prefix "$TEST_PREFIX"
     [ "$status" -eq 0 ]
     [[ "$output" == *"fail-job"*"exited(1)"* ]]

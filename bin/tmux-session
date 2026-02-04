@@ -98,7 +98,7 @@ cmd_status() {
         exit 1
     fi
     local total=0 running=0 exited=0 failed=0
-    while IFS='|' read -r name dead dead_status; do
+    while IFS='|' read -r name dead dead_status _cmd; do
         [[ "$name" == "_init" ]] && continue
         ((total++)) || true
         if [[ "$dead" == "1" ]]; then
@@ -109,7 +109,7 @@ cmd_status() {
         else
             ((running++)) || true
         fi
-    done < <(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null)
+    done < <(get_pane_info "$PREFIX")
 
     if [[ "$FORMAT" == "json" ]]; then
         printf '{"session":"%s","total":%d,"running":%d,"exited":%d,"failed":%d}\n' \

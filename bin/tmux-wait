@@ -77,7 +77,7 @@ if ! session_exists "$PREFIX"; then
 fi
 
 wait_single() {
-    local elapsed=0
+    local elapsed=0 status_retries=0
     while true; do
         line=$(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null \
             | awk -F'|' -v name="$NAME" '$1 == name {print; exit}')
@@ -91,6 +91,13 @@ wait_single() {
 
         if [[ "$dead" == "1" ]]; then
             if [[ -z "$dead_status" ]]; then
+                # Race condition: pane is dead but status not yet available
+                # Wait briefly and retry a few times before assuming killed
+                if [[ $status_retries -lt 20 ]]; then
+                    status_retries=$((status_retries + 1))
+                    sleep 0.1
+                    continue
+                fi
                 [[ "$QUIET" == true ]] || echo "Pane '$NAME' exited with unknown status (likely killed)" >&2
                 return 1
             fi
@@ -110,9 +117,9 @@ wait_single() {
 }
 
 wait_all() {
-    local elapsed=0 max_exit=0
+    local elapsed=0 max_exit=0 status_retries=0
     while true; do
-        local all_dead=true
+        local all_dead=true status_pending=false
         max_exit=0
         while IFS='|' read -r name dead dead_status; do
             [[ "$name" == "_init" ]] && continue
@@ -121,14 +128,24 @@ wait_all() {
                 break
             fi
             if [[ -z "$dead_status" ]]; then
-                dead_status=1
-            fi
-            if [[ "$dead_status" -gt "$max_exit" ]]; then
+                # Race condition: pane is dead but status not yet available
+                status_pending=true
+            elif [[ "$dead_status" -gt "$max_exit" ]]; then
                 max_exit="$dead_status"
             fi
         done < <(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}' 2>/dev/null)
 
         if [[ "$all_dead" == true ]]; then
+            if [[ "$status_pending" == true ]]; then
+                # Some panes are dead but status not yet populated - retry briefly
+                if [[ $status_retries -lt 20 ]]; then
+                    status_retries=$((status_retries + 1))
+                    sleep 0.1
+                    continue
+                fi
+                # After retries, treat missing status as exit code 1 (killed)
+                max_exit=$((max_exit > 1 ? max_exit : 1))
+            fi
             [[ "$PRINT" == true ]] && echo "$max_exit"
             return "$max_exit"
         fi

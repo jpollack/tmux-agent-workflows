@@ -76,12 +76,12 @@ if [[ "$COUNT" == true ]]; then
             if [[ "$FILTER" == "exited" && "$dead" != "1" ]]; then continue; fi
         fi
         ((count++)) || true
-    done < <(tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}|#{pane_current_command}' 2>/dev/null)
+    done < <(get_pane_info "$PREFIX")
     echo "$count"
     exit 0
 fi
 
-tmux list-windows -t "$PREFIX" -F '#{window_name}|#{pane_dead}|#{pane_dead_status}|#{pane_current_command}' 2>/dev/null | while IFS='|' read -r name dead dead_status cmd; do
+get_pane_info "$PREFIX" | while IFS='|' read -r name dead dead_status cmd; do
     [[ "$name" == "_init" ]] && continue
     if [[ -n "$FILTER" ]]; then
         if [[ "$FILTER" == "running" && "$dead" == "1" ]]; then continue; fi

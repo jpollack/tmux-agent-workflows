@@ -71,7 +71,8 @@ SCRIPT
     tmux-run --prefix "$TEST_PREFIX" --name ok -- true
     tmux-run --prefix "$TEST_PREFIX" --name fail1 -- bash -c 'exit 1'
     tmux-run --prefix "$TEST_PREFIX" --name fail5 -- bash -c 'exit 5'
-    sleep 1
+    # Give tmux time to record exit statuses (race condition mitigation)
+    sleep 2
     run tmux-wait --prefix "$TEST_PREFIX" --all --timeout 10
     [ "$status" -eq 5 ]  # Highest exit code
 }
@@ -90,7 +91,7 @@ SCRIPT
     tmux-run --prefix "$TEST_PREFIX" --name running2 -- sleep 60
     tmux-run --prefix "$TEST_PREFIX" --name success -- true
     tmux-run --prefix "$TEST_PREFIX" --name fail -- false
-    sleep 1
+    sleep 2  # Allow tmux to record exit statuses
     run tmux-session status --prefix "$TEST_PREFIX" --format json
     [ "$status" -eq 0 ]
     echo "$output" | python3 -c "
