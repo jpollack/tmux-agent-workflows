@@ -31,6 +31,15 @@ tmux-read --name build --last 50
 tmux-session destroy
 ```
 
+### Multiple Agent Sessions
+
+When running multiple Claude agents simultaneously, use unique prefixes:
+
+```bash
+tmux-session create --prefix agent-$$        # Process ID
+tmux-session create --prefix myproject-agent # Custom name
+```
+
 ## Quick Reference
 
 | Task | Command |
@@ -92,6 +101,15 @@ tmux-run --name server -- ./start-server.sh
 tmux-read --name server --grep "Listening on port" --timeout 30
 # Server is now ready
 ```
+
+### Limitation of --grep-invert
+
+The `--grep-invert` option waits for a pattern to NOT appear in the scrollback capture. Once text appears in output, it stays in scrollback history unless:
+- The screen is cleared (via `clear` command)
+- Text is overwritten using carriage return (`\r`)
+- The pane is replaced with `--replace` (which clears history)
+
+Use `--grep-invert` for detecting when a progress indicator is overwritten, not for waiting for arbitrary text to "disappear" from history.
 
 ### Environment Variables
 
@@ -179,6 +197,14 @@ Use `tmux-list` to check if status is `running` or `exited(N)`. If running but u
 
 ## Agent Workflow Examples
 
+### Chaining Commands
+
+Run multiple commands in sequence:
+
+```bash
+tmux-run --name pipeline -- bash -c 'npm install && npm run build && npm test'
+```
+
 ### Parallel Code Analysis
 
 ```bash
@@ -218,17 +244,37 @@ tmux-session destroy
 ```bash
 tmux-session create --prefix parallel-agents
 
-# Dispatch independent analysis tasks
+# Dispatch with unique output files
 tmux-run --prefix parallel-agents --name analyze-api -- \
-    claude -p "Analyze src/api for security issues" --output-file /tmp/api-analysis.md
+    claude -p "Analyze src/api" --output-file /tmp/api-analysis-$$.md
 tmux-run --prefix parallel-agents --name analyze-db -- \
-    claude -p "Review database queries for N+1 problems" --output-file /tmp/db-analysis.md
+    claude -p "Review queries" --output-file /tmp/db-analysis-$$.md
 
-# Wait for both
+# Wait and check results
 tmux-wait --prefix parallel-agents --all --timeout 600
+EXIT_CODE=$?
 
-# Aggregate results
-cat /tmp/api-analysis.md /tmp/db-analysis.md
+if [[ $EXIT_CODE -eq 0 ]]; then
+    cat /tmp/api-analysis-$$.md /tmp/db-analysis-$$.md
+else
+    echo "Some analyses failed (exit: $EXIT_CODE)"
+    tmux-list --prefix parallel-agents --filter exited
+fi
 
+# Cleanup
+rm -f /tmp/*-analysis-$$.md
 tmux-session destroy --prefix parallel-agents
 ```
+
+## Exit Code Reference
+
+| Scenario | Exit Code |
+|----------|-----------|
+| `tmux-wait` - command succeeded | 0 |
+| `tmux-wait` - command failed | 1-255 (command's code) |
+| `tmux-wait` - timeout | 124 |
+| `tmux-wait` - pane killed | 1 |
+| `tmux-wait --all` | Highest exit code |
+| `tmux-read --grep` - found | 0 |
+| `tmux-read --grep` - timeout | 124 |
+| `tmux-read --grep` - pane exited | 1 |

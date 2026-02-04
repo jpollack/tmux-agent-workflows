@@ -229,3 +229,11 @@ SCRIPT
     [ "$status" -eq 0 ]
     [[ "$output" == *"DONE"* ]]
 }
+
+@test "tmux-read handles unicode output" {
+    tmux-run --prefix "$TEST_PREFIX" --name unicode -- bash -c 'echo "Hello 世界 🚀"'
+    sleep 1
+    run tmux-read --prefix "$TEST_PREFIX" --name unicode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"世界"* ]]
+}

@@ -102,3 +102,14 @@ assert d['exited'] == 2, f'expected 2 exited, got {d[\"exited\"]}'
 assert d['failed'] == 1, f'expected 1 failed, got {d[\"failed\"]}'
 "
 }
+
+@test "subagent pattern: output file workflow" {
+    local result_file="/tmp/bats-subagent-$$.txt"
+    tmux-session create --prefix "$TEST_PREFIX"
+    tmux-run --prefix "$TEST_PREFIX" --name subagent -- bash -c "echo RESULT_DATA > $result_file"
+    run tmux-wait --prefix "$TEST_PREFIX" --name subagent --timeout 10
+    [ "$status" -eq 0 ]
+    [ -f "$result_file" ]
+    [ "$(cat $result_file)" = "RESULT_DATA" ]
+    rm -f "$result_file"
+}
